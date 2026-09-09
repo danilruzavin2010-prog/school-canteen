@@ -1,0 +1,58 @@
+import os
+import urllib.parse
+import psycopg2
+
+def get_db_connection():
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        print("❌ DATABASE_URL не найден!")
+        return None
+    
+    result = urllib.parse.urlparse(db_url)
+    conn = psycopg2.connect(
+        database=result.path[1:],
+        user=result.username,
+        password=result.password,
+        host=result.hostname,
+        port=result.port
+    )
+    return conn
+
+def create_tables():
+    conn = get_db_connection()
+    if not conn:
+        return
+    
+    cur = conn.cursor()
+    
+    # Создаём таблицы
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            vk_id BIGINT UNIQUE,
+            full_name TEXT,
+            department TEXT
+        );
+    ''')
+    
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS orders (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id),
+            class_name TEXT,
+            order_date DATE,
+            meal_type TEXT,
+            count_plat INTEGER DEFAULT 0,
+            count_bes INTEGER DEFAULT 0,
+            count_svo INTEGER DEFAULT 0,
+            count_ovz INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'новый'
+        );
+    ''')
+    
+    conn.commit()
+    conn.close()
+    print("✅ Таблицы users и orders созданы!")
+
+if __name__ == "__main__":
+    create_tables()
