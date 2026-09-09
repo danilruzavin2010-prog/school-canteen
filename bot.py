@@ -1,88 +1,117 @@
 import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
-import sqlite3
 import datetime
+import os
 import re
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
-VK_TOKEN = "vk1.a.z1AGhRJTlOfwdx4ldltGvv10FPkpmfgUHproUb6uREpo0Ao2TH8PCldeXPDFY7O7qVVkd2NdhCtOd1EJ321WsxAXw_BfL8U13lkhK3JC77rUvMuHAhqiaGB4VPMFnMvb9qhEjWXyXwzf4RtQIshOIxxFbKUJUjaEQgX9aouqhvaHYM0zvVLzTDE_9qEmIlFVIE7x7oGrqNuTYDWXGj2T4A"
+# === КОНФИГ ===
+VK_TOKEN = "vk1.a.z1AGhRJTlOfwdx4ldltGvv10FPkpmfgUHproUb6uREpo0Ao2TH8PCldeXPDFY7O7qVVkd2NdhCtOd1EJ321WsxAXw_BfL8U13lkhK3JC77rUvMuHAhqiaGB4VPMFnMvb9qhEjWXyXwzf4RtQIshOIxxFbKUJUjaEQgX9aouqhvaHYM0zvVLzTDE_9qEmIlFVIE7x7oGrqNuTYDWXGj2T4A"  
 GROUP_ID = 241386335
 
-DB_NAME = "canteen.db"
-temp_data = {}
+# === ПОДКЛЮЧЕНИЕ К POSTGRESQL (через DATABASE_URL) ===
+import urllib.parse
+import psycopg2
+
+def get_db_connection():
+    """Подключается к PostgreSQL через DATABASE_URL"""
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        # Если DATABASE_URL нет — используем SQLite (локально)
+        import sqlite3
+        return sqlite3.connect("canteen.db")
+    
+    # Парсим DATABASE_URL
+    result = urllib.parse.urlparse(db_url)
+    conn = psycopg2.connect(
+        database=result.path[1:],
+        user=result.username,
+        password=result.password,
+        host=result.hostname,
+        port=result.port
+    )
+    return conn
 
 def init_db():
-    conn = sqlite3.connect(DB_NAME)
+    """Создаёт таблицы, если их нет"""
+    conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            vk_id INTEGER UNIQUE,
-            full_name TEXT,
-            department TEXT
-        )
-    ''')
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS orders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            class_name TEXT,
-            order_date TEXT,
-            meal_type TEXT,
-            count_plat INTEGER DEFAULT 0,
-            count_bes INTEGER DEFAULT 0,
-            count_svo INTEGER DEFAULT 0,
-            count_ovz INTEGER DEFAULT 0,
-            status TEXT DEFAULT 'новый'
-        )
-    ''')
+    
+    # Проверяем, SQLite или PostgreSQL
+    if isinstance(conn, sqlite3.Connection):
+        cur.executescript('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                vk_id INTEGER UNIQUE,
+                full_name TEXT,
+                department TEXT
+            );
+            CREATE TABLE IF NOT EXISTS orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                class_name TEXT,
+                order_date TEXT,
+                meal_type TEXT,
+                count_plat INTEGER DEFAULT 0,
+                count_bes INTEGER DEFAULT 0,
+                count_svo INTEGER DEFAULT 0,
+                count_ovz INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'новый'
+            );
+        ''')
+    else:
+        # PostgreSQL
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                vk_id BIGINT UNIQUE,
+                full_name TEXT,
+                department TEXT
+            );
+            CREATE TABLE IF NOT EXISTS orders (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id),
+                class_name TEXT,
+                order_date DATE,
+                meal_type TEXT,
+                count_plat INTEGER DEFAULT 0,
+                count_bes INTEGER DEFAULT 0,
+                count_svo INTEGER DEFAULT 0,
+                count_ovz INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'новый'
+            );
+        ''')
+    
+    conn.commit()
+    conn.close()
+    print("✅ База данных инициализирована")
+
+def add_user(vk_id, name, dept="не указан"):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO users (vk_id, full_name, department) VALUES (%s, %s, %s) ON CONFLICT (vk_id) DO NOTHING", 
+                (vk_id, name, dept))
     conn.commit()
     conn.close()
 
 def get_user(vk_id):
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT id, full_name FROM users WHERE vk_id = ?", (vk_id,))
+    cur.execute("SELECT id, full_name FROM users WHERE vk_id = %s", (vk_id,))
     row = cur.fetchone()
     conn.close()
     return row
 
-def add_user(vk_id, name, dept="не указан"):
-    conn = sqlite3.connect(DB_NAME)
-    cur = conn.cursor()
-    cur.execute("INSERT OR IGNORE INTO users (vk_id, full_name, department) VALUES (?, ?, ?)", (vk_id, name, dept))
-    conn.commit()
-    conn.close()
-
 def create_order(user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz):
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     cur = conn.cursor()
     cur.execute('''
         INSERT INTO orders (user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'новый')
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'новый')
     ''', (user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz))
     conn.commit()
     conn.close()
-
-def get_orders_for_staff(date_filter=None, meal_filter=None):
-    conn = sqlite3.connect(DB_NAME)
-    cur = conn.cursor()
-    query = '''
-        SELECT u.full_name, o.class_name, o.meal_type, o.count_plat, o.count_bes, o.count_svo, o.count_ovz, o.status, o.order_date
-        FROM orders o
-        JOIN users u ON o.user_id = u.id
-        WHERE 1=1
-    '''
-    params = []
-    if date_filter:
-        query += " AND DATE(o.order_date) = ?"
-        params.append(date_filter)
-    if meal_filter:
-        query += " AND o.meal_type = ?"
-        params.append(meal_filter)
-    cur.execute(query, params)
-    rows = cur.fetchall()
-    conn.close()
-    return rows
 
 def parse_date(text):
     text = text.lower().strip()
@@ -103,7 +132,6 @@ def parse_date(text):
     return None
 
 def handle_message(event, vk):
-    global temp_data
     try:
         msg = event.obj.message['text'].lower().strip()
         from_id = event.obj.message['from_id']
@@ -130,60 +158,52 @@ def handle_message(event, vk):
             if from_id not in staff_ids:
                 vk.messages.send(user_id=from_id, message="Доступ запрещён.", random_id=0)
                 return
-            parts = msg.split()
-            date_str = None
-            meal_filter = None
-            label = "сегодня"
-            if len(parts) > 1:
-                date_str = parse_date(parts[1])
-                if date_str:
-                    label = parts[1]
-                else:
-                    meal_filter = parts[1]
-                    if len(parts) > 2:
-                        date_str = parse_date(parts[2])
-                        if date_str:
-                            label = parts[2]
-            if not date_str:
-                date_str = datetime.date.today().isoformat()
             
-            rows = get_orders_for_staff(date_str, meal_filter)
+            # Простой вариант — показываем заказы на сегодня
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute('''
+                SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, status
+                FROM orders
+                WHERE order_date = CURRENT_DATE
+            ''')
+            rows = cur.fetchall()
+            conn.close()
+            
             if not rows:
-                reply = f"Заказов на {label} нет."
-            else:
-                reply = f"📋 ЗАКАЗЫ НА {label}:\n\n"
-                total_plat = 0
-                total_bes = 0
-                total_svo = 0
-                total_ovz = 0
-                total_people = 0
-                for row in rows:
-                    # row: full_name, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, status, order_date
-                    reply += f"🏫 {row[1]} ({row[2]}): "
-                    parts_list = []
-                    if row[3] > 0:
-                        parts_list.append(f"💳 {row[3]} платн.")
-                        total_plat += row[3]
-                    if row[4] > 0:
-                        parts_list.append(f"🆓 {row[4]} бесплатн.")
-                        total_bes += row[4]
-                    if row[5] > 0:
-                        parts_list.append(f"⭐ {row[5]} СВО")
-                        total_svo += row[5]
-                    if row[6] > 0:
-                        parts_list.append(f"♿ {row[6]} ОВЗ")
-                        total_ovz += row[6]
-                    reply += " + ".join(parts_list)
-                    total_people += row[3] + row[4] + row[5] + row[6]
-                    reply += f" – {row[7]}\n"
-                reply += f"\n👥 Всего человек: {total_people}"
-                reply += f"\n💳 Платников: {total_plat} | 🆓 Бесплатников: {total_bes} | ⭐ СВО: {total_svo} | ♿ ОВЗ: {total_ovz}"
+                vk.messages.send(user_id=from_id, message="Заказов на сегодня нет.", random_id=0)
+                return
+            
+            reply = "📋 ЗАКАЗЫ НА СЕГОДНЯ:\n\n"
+            total_plat = total_bes = total_svo = total_ovz = 0
+            for row in rows:
+                class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, status = row
+                reply += f"🏫 {class_name} ({meal_type}): "
+                parts = []
+                if count_plat > 0:
+                    parts.append(f"💳 {count_plat} платн.")
+                    total_plat += count_plat
+                if count_bes > 0:
+                    parts.append(f"🆓 {count_bes} бесплатн.")
+                    total_bes += count_bes
+                if count_svo > 0:
+                    parts.append(f"⭐ {count_svo} СВО")
+                    total_svo += count_svo
+                if count_ovz > 0:
+                    parts.append(f"♿ {count_ovz} ОВЗ")
+                    total_ovz += count_ovz
+                reply += " + ".join(parts) + f" – {status}\n"
+            
+            total_people = total_plat + total_bes + total_svo + total_ovz
+            reply += f"\n👥 Всего: {total_people} чел."
+            reply += f"\n💳 {total_plat} | 🆓 {total_bes} | ⭐ {total_svo} | ♿ {total_ovz}"
             vk.messages.send(user_id=from_id, message=reply, random_id=0)
             return
 
-        # === ЗАКАЗ НА КЛАСС ===
-        if msg.startswith("заказать класс") or msg.startswith("заказать класс"):
-            temp_data[from_id] = {"step": "class_name", "date": datetime.date.today().isoformat()}
+        # === ЗАКАЗ НА КЛАСС (ПОШАГОВО) ===
+        if msg.startswith("заказать класс"):
+            # Шаг 1: запрашиваем название класса
+            temp_data[from_id] = {"step": "class_name"}
             vk.messages.send(
                 user_id=from_id,
                 message="🏫 ЗАКАЗ НА КЛАСС\n\nШаг 1. Напиши название класса (например: 9А)",
@@ -194,7 +214,6 @@ def handle_message(event, vk):
         if from_id in temp_data:
             step = temp_data[from_id].get("step")
             
-            # Шаг 1: Название класса
             if step == "class_name":
                 temp_data[from_id]["class_name"] = msg.upper()
                 temp_data[from_id]["step"] = "date"
@@ -205,22 +224,20 @@ def handle_message(event, vk):
                 )
                 return
             
-            # Шаг 2: Дата
             if step == "date":
                 date_str = parse_date(msg)
                 if not date_str:
-                    vk.messages.send(user_id=from_id, message="Неверный формат даты. Попробуй: сегодня, завтра или ГГГГ-ММ-ДД", random_id=0)
+                    vk.messages.send(user_id=from_id, message="Неверный формат даты.", random_id=0)
                     return
                 temp_data[from_id]["date"] = date_str
                 temp_data[from_id]["step"] = "meal_type"
                 vk.messages.send(
                     user_id=from_id,
-                    message="🍽 Шаг 3. Выбери приём пищи:\n- завтрак\n- обед\n\nМожно заказать оба сразу, но пока выбери один. После заказа сможешь заказать второй.",
+                    message="🍽 Шаг 3. Выбери приём пищи:\n- завтрак\n- обед",
                     random_id=0
                 )
                 return
             
-            # Шаг 3: Приём пищи
             if step == "meal_type":
                 if msg not in ["завтрак", "обед"]:
                     vk.messages.send(user_id=from_id, message="Напиши: завтрак или обед", random_id=0)
@@ -229,17 +246,16 @@ def handle_message(event, vk):
                 temp_data[from_id]["step"] = "counts"
                 vk.messages.send(
                     user_id=from_id,
-                    message="👥 Шаг 4. Напиши количество учеников по категориям в формате:\n\nПЛАТНИКИ, БЕСПЛАТНИКИ, СВО, ОВЗ\n\nПример: 10, 5, 2, 1\n\n(Если кого-то нет, пиши 0)",
+                    message="👥 Шаг 4. Напиши количество по категориям:\n\nПЛАТНИКИ, БЕСПЛАТНИКИ, СВО, ОВЗ\n\nПример: 10, 5, 2, 1",
                     random_id=0
                 )
                 return
             
-            # Шаг 4: Количество по категориям
             if step == "counts":
                 try:
                     parts = [int(p.strip()) for p in msg.split(',')]
                     if len(parts) != 4:
-                        vk.messages.send(user_id=from_id, message="Нужно 4 числа: платники, бесплатники, СВО, ОВЗ. Пример: 10, 5, 2, 1", random_id=0)
+                        vk.messages.send(user_id=from_id, message="Нужно 4 числа.", random_id=0)
                         return
                     count_plat, count_bes, count_svo, count_ovz = parts
                     if count_plat < 0 or count_bes < 0 or count_svo < 0 or count_ovz < 0:
@@ -256,41 +272,32 @@ def handle_message(event, vk):
                     create_order(user_id, class_name, date_str, meal_type, count_plat, count_bes, count_svo, count_ovz)
                     
                     total = count_plat + count_bes + count_svo + count_ovz
-                    reply = f"✅ ЗАКАЗ ОФОРМЛЕН!\n\n"
-                    reply += f"Класс: {class_name}\n"
-                    reply += f"Дата: {date_str}\n"
-                    reply += f"Приём: {meal_type}\n"
-                    reply += f"Платников: {count_plat}\n"
-                    reply += f"Бесплатников: {count_bes}\n"
-                    reply += f"СВО: {count_svo}\n"
-                    reply += f"ОВЗ: {count_ovz}\n"
-                    reply += f"Всего: {total} чел.\n\n"
-                    reply += "Чтобы заказать второй приём (завтрак или обед), напиши снова 'заказать класс'."
-                    
+                    reply = f"✅ ЗАКАЗ ОФОРМЛЕН!\n\nКласс: {class_name}\nДата: {date_str}\nПриём: {meal_type}\nПлатников: {count_plat}\nБесплатников: {count_bes}\nСВО: {count_svo}\nОВЗ: {count_ovz}\nВсего: {total} чел."
                     vk.messages.send(user_id=from_id, message=reply, random_id=0)
                     del temp_data[from_id]
                     
                 except ValueError:
-                    vk.messages.send(user_id=from_id, message="Ошибка! Пиши 4 числа через запятую. Пример: 10, 5, 2, 1", random_id=0)
+                    vk.messages.send(user_id=from_id, message="Ошибка! Пиши 4 числа через запятую.", random_id=0)
                 return
 
-        # === ПОМОЩЬ ===
         vk.messages.send(
             user_id=from_id,
-            message="📌 Команды:\n- заказать класс — сделать заказ на класс\n- отчёт — для сотрудников столовой (показать заказы)\n- отчёт завтра — заказы на завтра\n- отчёт обед — только обеды\n- отчёт обед завтра — обеды на завтра",
+            message="📌 Команды:\n- заказать класс — сделать заказ на класс\n- отчёт — для сотрудников столовой",
             random_id=0
         )
 
     except Exception as e:
         print(f"❌ ОШИБКА: {e}")
-        vk.messages.send(user_id=from_id, message=f"Произошла ошибка. Попробуй ещё раз.", random_id=0)
+
+# === ЗАПУСК БОТА ===
+temp_data = {}
 
 if __name__ == "__main__":
     init_db()
     vk_session = vk_api.VkApi(token=VK_TOKEN)
     vk = vk_session.get_api()
     longpoll = VkBotLongPoll(vk_session, GROUP_ID)
-    print("SWILL BOT ACTIVE")
+    print("🤖 SWILL BOT ACTIVE")
     print("Жду сообщений...")
     for event in longpoll.listen():
         if event.type == VkBotEventType.MESSAGE_NEW:
