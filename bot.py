@@ -3,26 +3,21 @@ from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 import datetime
 import os
 import re
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import urllib.parse
+import sys
 
 # === КОНФИГ ===
-VK_TOKEN = "vk1.a.z1AGhRJTlOfwdx4ldltGvv10FPkpmfgUHproUb6uREpo0Ao2TH8PCldeXPDFY7O7qVVkd2NdhCtOd1EJ321WsxAXw_BfL8U13lkhK3JC77rUvMuHAhqiaGB4VPMFnMvb9qhEjWXyXwzf4RtQIshOIxxFbKUJUjaEQgX9aouqhvaHYM0zvVLzTDE_9qEmIlFVIE7x7oGrqNuTYDWXGj2T4A"  
+VK_TOKEN = "vk1.a.z1AGhRJTlOfwdx4ldltGvv10FPkpmfgUHproUb6uREpo0Ao2TH8PCldeXPDFY7O7qVVkd2NdhCtOd1EJ321WsxAXw_BfL8U13lkhK3JC77rUvMuHAhqiaGB4VPMFnMvb9qhEjWXyXwzf4RtQIshOIxxFbKUJUjaEQgX9aouqhvaHYM0zvVLzTDE_9qEmIlFVIE7x7oGrqNuTYDWXGj2T4A"
 GROUP_ID = 241386335
 
-# === ПОДКЛЮЧЕНИЕ К POSTGRESQL (через DATABASE_URL) ===
-import urllib.parse
-import psycopg2
-
+# === ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ ===
 def get_db_connection():
-    """Подключается к PostgreSQL через DATABASE_URL"""
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
-        # Если DATABASE_URL нет — используем SQLite (локально)
         import sqlite3
-        return sqlite3.connect("canteen.db")
+        return sqlite3.connect("canteen.db"), "sqlite"
     
-    # Парсим DATABASE_URL
+    import psycopg2
     result = urllib.parse.urlparse(db_url)
     conn = psycopg2.connect(
         database=result.path[1:],
@@ -31,15 +26,13 @@ def get_db_connection():
         host=result.hostname,
         port=result.port
     )
-    return conn
+    return conn, "postgresql"
 
 def init_db():
-    """Создаёт таблицы, если их нет"""
-    conn = get_db_connection()
+    conn, db_type = get_db_connection()
     cur = conn.cursor()
     
-    # Проверяем, SQLite или PostgreSQL
-    if isinstance(conn, sqlite3.Connection):
+    if db_type == "sqlite":
         cur.executescript('''
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,7 +54,6 @@ def init_db():
             );
         ''')
     else:
-        # PostgreSQL
         cur.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -69,6 +61,8 @@ def init_db():
                 full_name TEXT,
                 department TEXT
             );
+        ''')
+        cur.execute('''
             CREATE TABLE IF NOT EXISTS orders (
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER REFERENCES users(id),
@@ -88,28 +82,39 @@ def init_db():
     print("✅ База данных инициализирована")
 
 def add_user(vk_id, name, dept="не указан"):
-    conn = get_db_connection()
+    conn, db_type = get_db_connection()
     cur = conn.cursor()
-    cur.execute("INSERT INTO users (vk_id, full_name, department) VALUES (%s, %s, %s) ON CONFLICT (vk_id) DO NOTHING", 
-                (vk_id, name, dept))
+    if db_type == "sqlite":
+        cur.execute("INSERT OR IGNORE INTO users (vk_id, full_name, department) VALUES (?, ?, ?)", (vk_id, name, dept))
+    else:
+        cur.execute("INSERT INTO users (vk_id, full_name, department) VALUES (%s, %s, %s) ON CONFLICT (vk_id) DO NOTHING", (vk_id, name, dept))
     conn.commit()
     conn.close()
 
 def get_user(vk_id):
-    conn = get_db_connection()
+    conn, db_type = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT id, full_name FROM users WHERE vk_id = %s", (vk_id,))
+    if db_type == "sqlite":
+        cur.execute("SELECT id, full_name FROM users WHERE vk_id = ?", (vk_id,))
+    else:
+        cur.execute("SELECT id, full_name FROM users WHERE vk_id = %s", (vk_id,))
     row = cur.fetchone()
     conn.close()
     return row
 
 def create_order(user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz):
-    conn = get_db_connection()
+    conn, db_type = get_db_connection()
     cur = conn.cursor()
-    cur.execute('''
-        INSERT INTO orders (user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz, status)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'новый')
-    ''', (user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz))
+    if db_type == "sqlite":
+        cur.execute('''
+            INSERT INTO orders (user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'новый')
+        ''', (user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz))
+    else:
+        cur.execute('''
+            INSERT INTO orders (user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'новый')
+        ''', (user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz))
     conn.commit()
     conn.close()
 
@@ -130,6 +135,8 @@ def parse_date(text):
             except:
                 return None
     return None
+
+temp_data = {}
 
 def handle_message(event, vk):
     try:
@@ -152,21 +159,26 @@ def handle_message(event, vk):
 
         user_id = user_data[0]
 
-        # === ОТЧЁТ ДЛЯ СОТРУДНИКОВ ===
         if msg.startswith("отчёт") or msg.startswith("!стафф"):
             staff_ids = [523723395]
             if from_id not in staff_ids:
                 vk.messages.send(user_id=from_id, message="Доступ запрещён.", random_id=0)
                 return
             
-            # Простой вариант — показываем заказы на сегодня
-            conn = get_db_connection()
+            conn, db_type = get_db_connection()
             cur = conn.cursor()
-            cur.execute('''
-                SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, status
-                FROM orders
-                WHERE order_date = CURRENT_DATE
-            ''')
+            if db_type == "sqlite":
+                cur.execute('''
+                    SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, status
+                    FROM orders
+                    WHERE order_date = DATE('now')
+                ''')
+            else:
+                cur.execute('''
+                    SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, status
+                    FROM orders
+                    WHERE order_date = CURRENT_DATE
+                ''')
             rows = cur.fetchall()
             conn.close()
             
@@ -200,9 +212,7 @@ def handle_message(event, vk):
             vk.messages.send(user_id=from_id, message=reply, random_id=0)
             return
 
-        # === ЗАКАЗ НА КЛАСС (ПОШАГОВО) ===
         if msg.startswith("заказать класс"):
-            # Шаг 1: запрашиваем название класса
             temp_data[from_id] = {"step": "class_name"}
             vk.messages.send(
                 user_id=from_id,
@@ -288,9 +298,6 @@ def handle_message(event, vk):
 
     except Exception as e:
         print(f"❌ ОШИБКА: {e}")
-
-# === ЗАПУСК БОТА ===
-temp_data = {}
 
 if __name__ == "__main__":
     init_db()

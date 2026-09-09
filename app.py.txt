@@ -1,38 +1,21 @@
 import threading
 import os
 import time
-import sys
-
-def init_database():
-    """Принудительно создаёт таблицы перед запуском"""
-    try:
-        # Импортируем функцию из bot.py
-        from bot import init_db
-        print("🔄 Создание таблиц...")
-        init_db()
-        print("✅ Таблицы созданы")
-    except Exception as e:
-        print(f"❌ Ошибка при создании таблиц: {e}")
 
 def run_bot():
-    """Запускает бота в отдельном потоке"""
     try:
         os.system("python bot.py")
     except Exception as e:
         print(f"❌ Бот упал: {e}")
 
 def run_web():
-    """Запускает веб-панель"""
     try:
         os.system("gunicorn web_panel:app --bind 0.0.0.0:5000")
     except Exception as e:
         print(f"❌ Веб-панель упала: {e}")
 
 if __name__ == "__main__":
-    print("🚀 Запуск приложения...")
-    
-    # Сначала создаём таблицы
-    init_database()
+    print("🚀 Запуск бота и веб-панели...")
     
     # Запускаем бота в фоне
     bot_thread = threading.Thread(target=run_bot, daemon=True)
