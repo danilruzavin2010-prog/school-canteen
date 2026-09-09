@@ -2,15 +2,16 @@ from flask import Flask, render_template_string, request
 import os
 import datetime
 import urllib.parse
+import sys
 
 app = Flask(__name__)
 
-# === ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ ===
+# === ОПРЕДЕЛЯЕМ ТИП БАЗЫ ДАННЫХ ===
 def get_db_connection():
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
         import sqlite3
-        return sqlite3.connect("canteen.db")
+        return sqlite3.connect("canteen.db"), "sqlite"
     
     import psycopg2
     result = urllib.parse.urlparse(db_url)
@@ -21,9 +22,9 @@ def get_db_connection():
         host=result.hostname,
         port=result.port
     )
-    return conn
+    return conn, "postgresql"
 
-# === HTML ШАБЛОН (адаптивный) ===
+# === HTML ШАБЛОН ===
 HTML = """
 <!DOCTYPE html>
 <html>
@@ -50,6 +51,8 @@ HTML = """
         .date-form { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
         .date-form input[type="date"] { padding: 8px; flex: 1; }
         .date-form button { padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 6px; }
+        .status-new { color: orange; }
+        .status-confirmed { color: green; }
         @media (max-width: 600px) {
             table { font-size: 12px; }
             th, td { padding: 4px; }
@@ -77,7 +80,7 @@ HTML = """
             <td class="svo">{{ row[4] }}</td>
             <td class="ovz">{{ row[5] }}</td>
             <td><strong>{{ row[2] + row[3] + row[4] + row[5] }}</strong></td>
-            <td>{{ row[6] }}</td>
+            <td class="status-{{ row[6] }}">{{ row[6] }}</td>
         </tr>
         {% endfor %}
     </table>
@@ -104,21 +107,34 @@ def panel():
     date_str = request.args.get('date', datetime.date.today().isoformat())
     meal_filter = request.args.get('meal', '')
     
-    conn = get_db_connection()
+    conn, db_type = get_db_connection()
     cur = conn.cursor()
     
-    query = '''
-        SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, status
-        FROM orders
-        WHERE order_date = %s
-    '''
-    params = [date_str]
+    # Универсальный запрос (работает и в SQLite, и в PostgreSQL)
+    if db_type == "postgresql":
+        query = '''
+            SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, status
+            FROM orders
+            WHERE order_date = %s
+        '''
+        params = [date_str]
+        if meal_filter and meal_filter != '':
+            query += " AND meal_type = %s"
+            params.append(meal_filter)
+        cur.execute(query, params)
+    else:
+        # SQLite
+        query = '''
+            SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, status
+            FROM orders
+            WHERE order_date = ?
+        '''
+        params = [date_str]
+        if meal_filter and meal_filter != '':
+            query += " AND meal_type = ?"
+            params.append(meal_filter)
+        cur.execute(query, params)
     
-    if meal_filter and meal_filter != '':
-        query += " AND meal_type = %s"
-        params.append(meal_filter)
-    
-    cur.execute(query, params)
     rows = cur.fetchall()
     conn.close()
     
