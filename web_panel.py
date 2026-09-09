@@ -1,12 +1,21 @@
-from flask import Flask, render_template_string, request
+import threading
 import os
+import time
+from flask import Flask, render_template_string, request
 import datetime
 import urllib.parse
-import sys
 
 app = Flask(__name__)
 
-# === ОПРЕДЕЛЯЕМ ТИП БАЗЫ ДАННЫХ ===
+# === ЗАПУСК БОТА В ФОНЕ ===
+def run_bot():
+    os.system("python bot.py")
+
+bot_thread = threading.Thread(target=run_bot, daemon=True)
+bot_thread.start()
+time.sleep(2)
+
+# === ДАЛЬШЕ ВЕБ-ПАНЕЛЬ ===
 def get_db_connection():
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
@@ -23,58 +32,6 @@ def get_db_connection():
         port=result.port
     )
     return conn, "postgresql"
-
-# === ВРЕМЕННЫЙ МАРШРУТ ДЛЯ СОЗДАНИЯ ТАБЛИЦ ===
-@app.route('/create_tables')
-def create_tables_route():
-    try:
-        import psycopg2
-        import urllib.parse
-        import os
-        
-        db_url = os.environ.get("DATABASE_URL")
-        if not db_url:
-            return "❌ DATABASE_URL не найден! Добавь переменную в RelaxDev."
-        
-        result = urllib.parse.urlparse(db_url)
-        conn = psycopg2.connect(
-            database=result.path[1:],
-            user=result.username,
-            password=result.password,
-            host=result.hostname,
-            port=result.port
-        )
-        cur = conn.cursor()
-        
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                vk_id BIGINT UNIQUE,
-                full_name TEXT,
-                department TEXT
-            );
-        ''')
-        
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS orders (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users(id),
-                class_name TEXT,
-                order_date DATE,
-                meal_type TEXT,
-                count_plat INTEGER DEFAULT 0,
-                count_bes INTEGER DEFAULT 0,
-                count_svo INTEGER DEFAULT 0,
-                count_ovz INTEGER DEFAULT 0,
-                status TEXT DEFAULT 'новый'
-            );
-        ''')
-        
-        conn.commit()
-        conn.close()
-        return "✅ Таблицы users и orders успешно созданы! <a href='/'>Вернуться на главную</a>"
-    except Exception as e:
-        return f"❌ Ошибка: {e}"
 
 # === HTML ШАБЛОН ===
 HTML = """
@@ -162,7 +119,6 @@ def panel():
     conn, db_type = get_db_connection()
     cur = conn.cursor()
     
-    # Универсальный запрос (работает и в SQLite, и в PostgreSQL)
     if db_type == "postgresql":
         query = '''
             SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, status
@@ -175,7 +131,6 @@ def panel():
             params.append(meal_filter)
         cur.execute(query, params)
     else:
-        # SQLite
         query = '''
             SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, status
             FROM orders
@@ -207,6 +162,57 @@ def panel():
         date=date_str,
         meal_filter=meal_filter
     )
+
+@app.route('/create_tables')
+def create_tables_route():
+    try:
+        import psycopg2
+        import urllib.parse
+        import os
+        
+        db_url = os.environ.get("DATABASE_URL")
+        if not db_url:
+            return "❌ DATABASE_URL не найден! Добавь переменную в RelaxDev."
+        
+        result = urllib.parse.urlparse(db_url)
+        conn = psycopg2.connect(
+            database=result.path[1:],
+            user=result.username,
+            password=result.password,
+            host=result.hostname,
+            port=result.port
+        )
+        cur = conn.cursor()
+        
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                vk_id BIGINT UNIQUE,
+                full_name TEXT,
+                department TEXT
+            );
+        ''')
+        
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS orders (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id),
+                class_name TEXT,
+                order_date DATE,
+                meal_type TEXT,
+                count_plat INTEGER DEFAULT 0,
+                count_bes INTEGER DEFAULT 0,
+                count_svo INTEGER DEFAULT 0,
+                count_ovz INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'новый'
+            );
+        ''')
+        
+        conn.commit()
+        conn.close()
+        return "✅ Таблицы users и orders успешно созданы! <a href='/'>Вернуться на главную</a>"
+    except Exception as e:
+        return f"❌ Ошибка: {e}"
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
