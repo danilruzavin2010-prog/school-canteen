@@ -159,8 +159,8 @@ def handle_message(event, vk):
 
         user_id = user_data[0]
 
-        if msg.startswith("отчёт") or msg.startswith("!стафф"):
-            staff_ids = [523723395, 768610229]
+                if msg.startswith("отчёт") or msg.startswith("!стафф"):
+            staff_ids = [523723395]  # ЗАМЕНИ НА СВОЙ VK ID
             if from_id not in staff_ids:
                 vk.messages.send(user_id=from_id, message="Доступ запрещён.", random_id=0)
                 return
@@ -185,6 +185,95 @@ def handle_message(event, vk):
             if not rows:
                 vk.messages.send(user_id=from_id, message="Заказов на сегодня нет.", random_id=0)
                 return
+            
+            # Разделяем заказы по приёму пищи
+            breakfast = []  # завтраки
+            lunch = []      # обеды
+            
+            for row in rows:
+                class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, status = row
+                if meal_type == "завтрак":
+                    breakfast.append(row)
+                elif meal_type == "обед":
+                    lunch.append(row)
+            
+            reply = ""
+            
+            # === ЗАВТРАКИ ===
+            total_breakfast_people = 0
+            total_breakfast_plat = total_breakfast_bes = total_breakfast_svo = total_breakfast_ovz = 0
+            
+            if breakfast:
+                reply += "🌅 ЗАВТРАКИ:\n"
+                for row in breakfast:
+                    class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, status = row
+                    total = count_plat + count_bes + count_svo + count_ovz
+                    total_breakfast_people += total
+                    total_breakfast_plat += count_plat
+                    total_breakfast_bes += count_bes
+                    total_breakfast_svo += count_svo
+                    total_breakfast_ovz += count_ovz
+                    
+                    parts = []
+                    if count_plat > 0:
+                        parts.append(f"💳{count_plat}")
+                    if count_bes > 0:
+                        parts.append(f"🆓{count_bes}")
+                    if count_svo > 0:
+                        parts.append(f"⭐{count_svo}")
+                    if count_ovz > 0:
+                        parts.append(f"♿{count_ovz}")
+                    
+                    reply += f"🏫 {class_name}: {' + '.join(parts)} = {total} чел.\n"
+                
+                reply += f"━━━━━━━━━━━━━━━━━━━\n"
+                reply += f"ИТОГО ЗАВТРАКОВ: {total_breakfast_people} чел.\n"
+                reply += f"(💳{total_breakfast_plat} | 🆓{total_breakfast_bes} | ⭐{total_breakfast_svo} | ♿{total_breakfast_ovz})\n\n"
+            else:
+                reply += "🌅 ЗАВТРАКИ: нет заказов\n\n"
+            
+            # === ОБЕДЫ ===
+            total_lunch_people = 0
+            total_lunch_plat = total_lunch_bes = total_lunch_svo = total_lunch_ovz = 0
+            
+            if lunch:
+                reply += "🌞 ОБЕДЫ:\n"
+                for row in lunch:
+                    class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, status = row
+                    total = count_plat + count_bes + count_svo + count_ovz
+                    total_lunch_people += total
+                    total_lunch_plat += count_plat
+                    total_lunch_bes += count_bes
+                    total_lunch_svo += count_svo
+                    total_lunch_ovz += count_ovz
+                    
+                    parts = []
+                    if count_plat > 0:
+                        parts.append(f"💳{count_plat}")
+                    if count_bes > 0:
+                        parts.append(f"🆓{count_bes}")
+                    if count_svo > 0:
+                        parts.append(f"⭐{count_svo}")
+                    if count_ovz > 0:
+                        parts.append(f"♿{count_ovz}")
+                    
+                    reply += f"🏫 {class_name}: {' + '.join(parts)} = {total} чел.\n"
+                
+                reply += f"━━━━━━━━━━━━━━━━━━━\n"
+                reply += f"ИТОГО ОБЕДОВ: {total_lunch_people} чел.\n"
+                reply += f"(💳{total_lunch_plat} | 🆓{total_lunch_bes} | ⭐{total_lunch_svo} | ♿{total_lunch_ovz})\n\n"
+            else:
+                reply += "🌞 ОБЕДЫ: нет заказов\n\n"
+            
+            # === ОБЩИЙ ИТОГ ===
+            total_all = total_breakfast_people + total_lunch_people
+            reply += f"━━━━━━━━━━━━━━━━━━━\n"
+            reply += f"👥 ВСЕГО ПОРЦИЙ: {total_all} чел.\n"
+            reply += f"🌅 Завтраков: {total_breakfast_people}\n"
+            reply += f"🌞 Обедов: {total_lunch_people}"
+            
+            vk.messages.send(user_id=from_id, message=reply, random_id=0)
+            return
             
             reply = "📋 ЗАКАЗЫ НА СЕГОДНЯ:\n\n"
             total_plat = total_bes = total_svo = total_ovz = 0
