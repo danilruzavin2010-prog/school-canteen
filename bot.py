@@ -160,7 +160,7 @@ def handle_message(event, vk):
         user_id = user_data[0]
 
                 if msg.startswith("отчёт") or msg.startswith("!стафф"):
-            staff_ids = [523723395]  # ЗАМЕНИ НА СВОЙ VK ID
+            staff_ids = [523723395, 768610229]  # ЗАМЕНИ НА СВОЙ VK ID
             if from_id not in staff_ids:
                 vk.messages.send(user_id=from_id, message="Доступ запрещён.", random_id=0)
                 return
