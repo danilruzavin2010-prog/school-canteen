@@ -159,8 +159,9 @@ def handle_message(event, vk):
 
         user_id = user_data[0]
 
-                if msg.startswith("отчёт") or msg.startswith("!стафф"):
-            staff_ids = [523723395, 768610229]  # ЗАМЕНИ НА СВОЙ VK ID
+        # === ОТЧЁТ ДЛЯ СОТРУДНИКОВ ===
+        if msg.startswith("отчёт") or msg.startswith("!стафф"):
+            staff_ids = [523723395, 768610229]
             if from_id not in staff_ids:
                 vk.messages.send(user_id=from_id, message="Доступ запрещён.", random_id=0)
                 return
@@ -186,10 +187,8 @@ def handle_message(event, vk):
                 vk.messages.send(user_id=from_id, message="Заказов на сегодня нет.", random_id=0)
                 return
             
-            # Разделяем заказы по приёму пищи
-            breakfast = []  # завтраки
-            lunch = []      # обеды
-            
+            breakfast = []
+            lunch = []
             for row in rows:
                 class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, status = row
                 if meal_type == "завтрак":
@@ -199,7 +198,7 @@ def handle_message(event, vk):
             
             reply = ""
             
-            # === ЗАВТРАКИ ===
+            # ЗАВТРАКИ
             total_breakfast_people = 0
             total_breakfast_plat = total_breakfast_bes = total_breakfast_svo = total_breakfast_ovz = 0
             
@@ -226,13 +225,13 @@ def handle_message(event, vk):
                     
                     reply += f"🏫 {class_name}: {' + '.join(parts)} = {total} чел.\n"
                 
-                reply += f"━━━━━━━━━━━━━━━━━━━\n"
+                reply += "━━━━━━━━━━━━━━━━━━━\n"
                 reply += f"ИТОГО ЗАВТРАКОВ: {total_breakfast_people} чел.\n"
                 reply += f"(💳{total_breakfast_plat} | 🆓{total_breakfast_bes} | ⭐{total_breakfast_svo} | ♿{total_breakfast_ovz})\n\n"
             else:
                 reply += "🌅 ЗАВТРАКИ: нет заказов\n\n"
             
-            # === ОБЕДЫ ===
+            # ОБЕДЫ
             total_lunch_people = 0
             total_lunch_plat = total_lunch_bes = total_lunch_svo = total_lunch_ovz = 0
             
@@ -259,48 +258,22 @@ def handle_message(event, vk):
                     
                     reply += f"🏫 {class_name}: {' + '.join(parts)} = {total} чел.\n"
                 
-                reply += f"━━━━━━━━━━━━━━━━━━━\n"
+                reply += "━━━━━━━━━━━━━━━━━━━\n"
                 reply += f"ИТОГО ОБЕДОВ: {total_lunch_people} чел.\n"
                 reply += f"(💳{total_lunch_plat} | 🆓{total_lunch_bes} | ⭐{total_lunch_svo} | ♿{total_lunch_ovz})\n\n"
             else:
                 reply += "🌞 ОБЕДЫ: нет заказов\n\n"
             
-            # === ОБЩИЙ ИТОГ ===
             total_all = total_breakfast_people + total_lunch_people
-            reply += f"━━━━━━━━━━━━━━━━━━━\n"
+            reply += "━━━━━━━━━━━━━━━━━━━\n"
             reply += f"👥 ВСЕГО ПОРЦИЙ: {total_all} чел.\n"
             reply += f"🌅 Завтраков: {total_breakfast_people}\n"
             reply += f"🌞 Обедов: {total_lunch_people}"
             
             vk.messages.send(user_id=from_id, message=reply, random_id=0)
             return
-            
-            reply = "📋 ЗАКАЗЫ НА СЕГОДНЯ:\n\n"
-            total_plat = total_bes = total_svo = total_ovz = 0
-            for row in rows:
-                class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, status = row
-                reply += f"🏫 {class_name} ({meal_type}): "
-                parts = []
-                if count_plat > 0:
-                    parts.append(f"💳 {count_plat} платн.")
-                    total_plat += count_plat
-                if count_bes > 0:
-                    parts.append(f"🆓 {count_bes} бесплатн.")
-                    total_bes += count_bes
-                if count_svo > 0:
-                    parts.append(f"⭐ {count_svo} СВО")
-                    total_svo += count_svo
-                if count_ovz > 0:
-                    parts.append(f"♿ {count_ovz} ОВЗ")
-                    total_ovz += count_ovz
-                reply += " + ".join(parts) + f" – {status}\n"
-            
-            total_people = total_plat + total_bes + total_svo + total_ovz
-            reply += f"\n👥 Всего: {total_people} чел."
-            reply += f"\n💳 {total_plat} | 🆓 {total_bes} | ⭐ {total_svo} | ♿ {total_ovz}"
-            vk.messages.send(user_id=from_id, message=reply, random_id=0)
-            return
 
+        # === ЗАКАЗ НА КЛАСС ===
         if msg.startswith("заказать класс"):
             temp_data[from_id] = {"step": "class_name"}
             vk.messages.send(
