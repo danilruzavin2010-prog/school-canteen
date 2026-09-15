@@ -11,7 +11,7 @@ VK_TOKEN = "vk1.a.z1AGhRJTlOfwdx4ldltGvv10FPkpmfgUHproUb6uREpo0Ao2TH8PCldeXPDFY7
 GROUP_ID = 241386335
 
 # === ID СОТРУДНИКОВ (кто может редактировать и смотреть отчёт) ===
-STAFF_IDS = [523723395]
+STAFF_IDS = [523723395, 768610229, 165518301]
 
 # === ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ ===
 def get_db_connection():
