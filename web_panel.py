@@ -1,21 +1,10 @@
-import threading
-import os
-import time
 from flask import Flask, render_template_string, request
+import os
 import datetime
 import urllib.parse
 
 app = Flask(__name__)
 
-# === ЗАПУСК БОТА В ФОНЕ ===
-def run_bot():
-    os.system("python bot.py")
-
-bot_thread = threading.Thread(target=run_bot, daemon=True)
-bot_thread.start()
-time.sleep(2)
-
-# === ДАЛЬШЕ ВЕБ-ПАНЕЛЬ ===
 def get_db_connection():
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
@@ -33,7 +22,6 @@ def get_db_connection():
     )
     return conn, "postgresql"
 
-# === HTML ШАБЛОН ===
 HTML = """
 <!DOCTYPE html>
 <html>
@@ -43,30 +31,39 @@ HTML = """
     <title>🍽 Панель столовой</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 10px; background: #f5f5f5; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 16px; border-radius: 12px; }
+        .container { max-width: 1100px; margin: 0 auto; background: white; padding: 16px; border-radius: 12px; }
         h1 { font-size: 20px; }
-        table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        th { background: #4CAF50; color: white; padding: 8px; }
-        td { padding: 8px; text-align: center; border-bottom: 1px solid #ddd; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #4CAF50; color: white; padding: 8px 4px; }
+        td { padding: 8px 4px; text-align: center; border-bottom: 1px solid #ddd; }
         .plat { color: green; }
         .bes { color: blue; }
         .svo { color: orange; }
         .ovz { color: purple; }
+        .podvoz { color: #d35400; }
         .totals { margin-top: 16px; padding: 12px; background: #f0f0f0; border-radius: 8px; }
         .totals span { font-weight: bold; }
         .filters { margin: 12px 0; }
-        .filter-btn { padding: 6px 12px; background: #e0e0e0; border-radius: 16px; text-decoration: none; color: black; margin-right: 8px; }
+        .filter-btn { padding: 6px 12px; background: #e0e0e0; border-radius: 16px; text-decoration: none; color: black; margin-right: 8px; display: inline-block; }
         .filter-btn.active { background: #4CAF50; color: white; }
         .date-form { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
         .date-form input[type="date"] { padding: 8px; flex: 1; }
         .date-form button { padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 6px; }
-        .status-new { color: orange; }
-        .status-confirmed { color: green; }
-        @media (max-width: 600px) {
-            table { font-size: 12px; }
-            th, td { padding: 4px; }
+        .names-btn { cursor: pointer; color: #1976D2; text-decoration: underline; font-size: 11px; }
+        .names-block { display: none; text-align: left; font-size: 12px; padding: 8px; background: #fafafa; border-radius: 6px; margin-top: 4px; }
+        .names-block.show { display: block; }
+        .names-block b { display: inline-block; min-width: 100px; }
+        @media (max-width: 700px) {
+            table { font-size: 11px; }
+            th, td { padding: 4px 2px; }
         }
     </style>
+    <script>
+        function toggleNames(id) {
+            var el = document.getElementById('names-' + id);
+            if (el) el.classList.toggle('show');
+        }
+    </script>
 </head>
 <body>
 <div class="container">
@@ -79,7 +76,11 @@ HTML = """
     </div>
 
     <table>
-        <tr><th>Класс</th><th>Приём</th><th>Платники</th><th>Бесплатники</th><th>СВО</th><th>ОВЗ</th><th>Всего</th><th>Статус</th></tr>
+        <tr>
+            <th>Класс</th><th>Приём</th>
+            <th>💳</th><th>🆓</th><th>⭐</th><th>♿</th><th>🚌</th>
+            <th>Всего</th><th>Фамилии</th>
+        </tr>
         {% for row in orders %}
         <tr>
             <td><strong>{{ row[0] }}</strong></td>
@@ -88,18 +89,39 @@ HTML = """
             <td class="bes">{{ row[3] }}</td>
             <td class="svo">{{ row[4] }}</td>
             <td class="ovz">{{ row[5] }}</td>
-            <td><strong>{{ row[2] + row[3] + row[4] + row[5] }}</strong></td>
-            <td class="status-{{ row[6] }}">{{ row[6] }}</td>
+            <td class="podvoz">{{ row[6] }}</td>
+            <td><strong>{{ row[2] + row[3] + row[4] + row[5] + row[6] }}</strong></td>
+            <td>
+                <span class="names-btn" onclick="toggleNames({{ row[8] }})">показать</span>
+                <div class="names-block" id="names-{{ row[8] }}">
+                    {% if row[7] %}
+                        <div><b>💳 Платники:</b> {{ row[7] }}</div>
+                    {% endif %}
+                    {% if row[9] %}
+                        <div><b>🆓 Бесплатники:</b> {{ row[9] }}</div>
+                    {% endif %}
+                    {% if row[10] %}
+                        <div><b>⭐ СВО:</b> {{ row[10] }}</div>
+                    {% endif %}
+                    {% if row[11] %}
+                        <div><b>♿ ОВЗ:</b> {{ row[11] }}</div>
+                    {% endif %}
+                    {% if row[12] %}
+                        <div><b>🚌 Подвоз:</b> {{ row[12] }}</div>
+                    {% endif %}
+                </div>
+            </td>
         </tr>
         {% endfor %}
     </table>
 
     <div class="totals">
-        <p>👥 Всего: <span>{{ total_people }}</span> чел.</p>
+        <p>👥 Всего порций: <span>{{ total_people }}</span></p>
         <p>💳 Платники: <span class="plat">{{ total_plat }}</span> | 
            🆓 Бесплатники: <span class="bes">{{ total_bes }}</span> | 
            ⭐ СВО: <span class="svo">{{ total_svo }}</span> | 
-           ♿ ОВЗ: <span class="ovz">{{ total_ovz }}</span></p>
+           ♿ ОВЗ: <span class="ovz">{{ total_ovz }}</span> | 
+           🚌 Подвоз: <span class="podvoz">{{ total_podvoz }}</span></p>
     </div>
 
     <form method="GET" class="date-form">
@@ -119,100 +141,69 @@ def panel():
     conn, db_type = get_db_connection()
     cur = conn.cursor()
     
+    base_select = '''
+        SELECT id, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz,
+               names_plat, names_bes, names_svo, names_ovz, names_podvoz, status
+        FROM orders
+        WHERE order_date = {}
+    '''
+    
     if db_type == "postgresql":
-        query = '''
-            SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, status
-            FROM orders
-            WHERE order_date = %s
-        '''
+        query = base_select.format("%s")
         params = [date_str]
-        if meal_filter and meal_filter != '':
+        if meal_filter:
             query += " AND meal_type = %s"
             params.append(meal_filter)
-        cur.execute(query, params)
     else:
-        query = '''
-            SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, status
-            FROM orders
-            WHERE order_date = ?
-        '''
+        query = base_select.format("?")
         params = [date_str]
-        if meal_filter and meal_filter != '':
+        if meal_filter:
             query += " AND meal_type = ?"
             params.append(meal_filter)
-        cur.execute(query, params)
     
-    rows = cur.fetchall()
+    cur.execute(query, params)
+    raw = cur.fetchall()
     conn.close()
     
-    total_plat = sum(r[2] for r in rows)
-    total_bes = sum(r[3] for r in rows)
-    total_svo = sum(r[4] for r in rows)
-    total_ovz = sum(r[5] for r in rows)
-    total_people = total_plat + total_bes + total_svo + total_ovz
+    # Переставляем колонки: class_name, meal_type, cp, cb, cs, co, cpz, np, id, nb, ns, no, npz
+    orders = []
+    for r in raw:
+        # r = (id, class_name, meal_type, cp, cb, cs, co, cpz, np, nb, ns, no, npz, status)
+        orders.append((
+            r[1],   # class_name
+            r[2],   # meal_type
+            r[3],   # count_plat
+            r[4],   # count_bes
+            r[5],   # count_svo
+            r[6],   # count_ovz
+            r[7],   # count_podvoz
+            r[8],   # names_plat
+            r[0],   # id (для toggle)
+            r[9],   # names_bes
+            r[10],  # names_svo
+            r[11],  # names_ovz
+            r[12],  # names_podvoz
+        ))
+    
+    total_plat = sum(o[2] for o in orders)
+    total_bes = sum(o[3] for o in orders)
+    total_svo = sum(o[4] for o in orders)
+    total_ovz = sum(o[5] for o in orders)
+    total_podvoz = sum(o[6] for o in orders)
+    total_people = total_plat + total_bes + total_svo + total_ovz + total_podvoz
     
     return render_template_string(
         HTML,
-        orders=rows,
+        orders=orders,
         total_plat=total_plat,
         total_bes=total_bes,
         total_svo=total_svo,
         total_ovz=total_ovz,
+        total_podvoz=total_podvoz,
         total_people=total_people,
         date=date_str,
         meal_filter=meal_filter
     )
-
-@app.route('/create_tables')
-def create_tables_route():
-    try:
-        import psycopg2
-        import urllib.parse
-        import os
-        
-        db_url = os.environ.get("DATABASE_URL")
-        if not db_url:
-            return "❌ DATABASE_URL не найден! Добавь переменную в RelaxDev."
-        
-        result = urllib.parse.urlparse(db_url)
-        conn = psycopg2.connect(
-            database=result.path[1:],
-            user=result.username,
-            password=result.password,
-            host=result.hostname,
-            port=result.port
-        )
-        cur = conn.cursor()
-        
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                vk_id BIGINT UNIQUE,
-                full_name TEXT,
-                department TEXT
-            );
-        ''')
-        
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS orders (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users(id),
-                class_name TEXT,
-                order_date DATE,
-                meal_type TEXT,
-                count_plat INTEGER DEFAULT 0,
-                count_bes INTEGER DEFAULT 0,
-                count_svo INTEGER DEFAULT 0,
-                count_ovz INTEGER DEFAULT 0,
-                status TEXT DEFAULT 'новый'
-            );
-        ''')
-        
-        conn.commit()
-        conn.close()
-        return "✅ Таблицы users и orders успешно созданы! <a href='/'>Вернуться на главную</a>"
-    except Exception as e:
-        return f"❌ Ошибка: {e}"
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
