@@ -50,6 +50,11 @@ def init_db():
                 count_svo INTEGER DEFAULT 0,
                 count_ovz INTEGER DEFAULT 0,
                 count_podvoz INTEGER DEFAULT 0,
+                names_plat TEXT DEFAULT '',
+                names_bes TEXT DEFAULT '',
+                names_svo TEXT DEFAULT '',
+                names_ovz TEXT DEFAULT '',
+                names_podvoz TEXT DEFAULT '',
                 status TEXT DEFAULT 'новый'
             );
         ''')
@@ -74,6 +79,11 @@ def init_db():
                 count_svo INTEGER DEFAULT 0,
                 count_ovz INTEGER DEFAULT 0,
                 count_podvoz INTEGER DEFAULT 0,
+                names_plat TEXT DEFAULT '',
+                names_bes TEXT DEFAULT '',
+                names_svo TEXT DEFAULT '',
+                names_ovz TEXT DEFAULT '',
+                names_podvoz TEXT DEFAULT '',
                 status TEXT DEFAULT 'новый'
             );
         ''')
@@ -102,19 +112,21 @@ def get_user(vk_id):
     conn.close()
     return row
 
-def create_order(user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz):
+def create_order(user_id, class_name, order_date, meal_type, cp, cb, cs, co, cpz, np, nb, ns, no, npz):
     conn, db_type = get_db_connection()
     cur = conn.cursor()
     if db_type == "sqlite":
         cur.execute('''
-            INSERT INTO orders (user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'новый')
-        ''', (user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz))
+            INSERT INTO orders (user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz,
+                                names_plat, names_bes, names_svo, names_ovz, names_podvoz, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'новый')
+        ''', (user_id, class_name, order_date, meal_type, cp, cb, cs, co, cpz, np, nb, ns, no, npz))
     else:
         cur.execute('''
-            INSERT INTO orders (user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz, status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'новый')
-        ''', (user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz))
+            INSERT INTO orders (user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz,
+                                names_plat, names_bes, names_svo, names_ovz, names_podvoz, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'новый')
+        ''', (user_id, class_name, order_date, meal_type, cp, cb, cs, co, cpz, np, nb, ns, no, npz))
     conn.commit()
     conn.close()
 
@@ -123,17 +135,11 @@ def get_user_orders_today(user_id):
     conn, db_type = get_db_connection()
     cur = conn.cursor()
     if db_type == "sqlite":
-        cur.execute('''
-            SELECT id, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz
-            FROM orders
-            WHERE user_id = ? AND order_date = ?
-        ''', (user_id, today))
+        cur.execute('''SELECT id, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz
+                       FROM orders WHERE user_id = ? AND order_date = ?''', (user_id, today))
     else:
-        cur.execute('''
-            SELECT id, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz
-            FROM orders
-            WHERE user_id = %s AND order_date = %s
-        ''', (user_id, today))
+        cur.execute('''SELECT id, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz
+                       FROM orders WHERE user_id = %s AND order_date = %s''', (user_id, today))
     rows = cur.fetchall()
     conn.close()
     return rows
@@ -216,6 +222,18 @@ def get_date_keyboard():
     keyboard.add_button("Послезавтра", color=VkKeyboardColor.SECONDARY)
     return keyboard.get_keyboard()
 
+def get_category_keyboard():
+    keyboard = VkKeyboard(one_time=True)
+    keyboard.add_button("💳 Платники", color=VkKeyboardColor.PRIMARY)
+    keyboard.add_button("🆓 Бесплатники", color=VkKeyboardColor.PRIMARY)
+    keyboard.add_line()
+    keyboard.add_button("⭐ СВО", color=VkKeyboardColor.SECONDARY)
+    keyboard.add_button("♿ ОВЗ", color=VkKeyboardColor.SECONDARY)
+    keyboard.add_line()
+    keyboard.add_button("🚌 Подвоз", color=VkKeyboardColor.SECONDARY)
+    keyboard.add_button("✅ Готово", color=VkKeyboardColor.POSITIVE)
+    return keyboard.get_keyboard()
+
 def get_edit_keyboard(order_id):
     keyboard = VkKeyboard(one_time=False)
     keyboard.add_button("💳 +1", color=VkKeyboardColor.POSITIVE)
@@ -240,11 +258,7 @@ def get_edit_keyboard(order_id):
 temp_data = {}
 
 def send(vk, user_id, message, keyboard=None):
-    params = {
-        'user_id': user_id,
-        'message': message,
-        'random_id': 0
-    }
+    params = {'user_id': user_id, 'message': message, 'random_id': 0}
     if keyboard:
         params['keyboard'] = keyboard
     vk.messages.send(**params)
@@ -254,7 +268,6 @@ def show_my_orders(vk, from_id, user_id):
     if not orders:
         send(vk, from_id, "У тебя нет заказов на сегодня.", get_main_keyboard())
         return
-    
     reply = "📋 ТВОИ ЗАКАЗЫ НА СЕГОДНЯ:\n\n"
     for o in orders:
         order_id, class_name, meal_type, cp, cb, cs, co, cpz = o
@@ -277,9 +290,7 @@ def handle_message(event, vk):
         user_data = get_user(from_id)
         if not user_data:
             add_user(from_id, name)
-            send(vk, from_id, 
-                 "👋 Привет! Ты можешь заказывать питание на класс.\n\nВыбери действие на клавиатуре 👇",
-                 get_main_keyboard())
+            send(vk, from_id, "👋 Привет! Заказывай питание на класс.\n\nВыбери действие 👇", get_main_keyboard())
             return
 
         user_id = user_data[0]
@@ -290,7 +301,6 @@ def handle_message(event, vk):
             if from_id not in staff_ids:
                 send(vk, from_id, "Доступ запрещён.", get_main_keyboard())
                 return
-            
             conn, db_type = get_db_connection()
             cur = conn.cursor()
             if db_type == "sqlite":
@@ -299,25 +309,21 @@ def handle_message(event, vk):
                 cur.execute('''SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz, status FROM orders WHERE order_date = CURRENT_DATE''')
             rows = cur.fetchall()
             conn.close()
-            
             if not rows:
                 send(vk, from_id, "Заказов на сегодня нет.", get_main_keyboard())
                 return
-            
             breakfast, lunch = [], []
             for row in rows:
-                (class_name, meal_type, cp, cb, cs, co, cpz, status) = row
-                if meal_type == "завтрак":
+                if row[1] == "завтрак":
                     breakfast.append(row)
                 else:
                     lunch.append(row)
-            
             reply = ""
             btotal = 0
             if breakfast:
                 reply += "🌅 ЗАВТРАКИ:\n"
                 for row in breakfast:
-                    (class_name, meal_type, cp, cb, cs, co, cpz, status) = row
+                    (cn, mt, cp, cb, cs, co, cpz, st) = row
                     total = cp + cb + cs + co + cpz
                     btotal += total
                     parts = []
@@ -326,16 +332,15 @@ def handle_message(event, vk):
                     if cs: parts.append(f"⭐{cs}")
                     if co: parts.append(f"♿{co}")
                     if cpz: parts.append(f"🚌{cpz}")
-                    reply += f"🏫 {class_name}: {' + '.join(parts)} = {total}\n"
+                    reply += f"🏫 {cn}: {' + '.join(parts)} = {total}\n"
                 reply += f"ИТОГО: {btotal} чел.\n\n"
             else:
                 reply += "🌅 ЗАВТРАКИ: нет\n\n"
-            
             ltotal = 0
             if lunch:
                 reply += "🌞 ОБЕДЫ:\n"
                 for row in lunch:
-                    (class_name, meal_type, cp, cb, cs, co, cpz, status) = row
+                    (cn, mt, cp, cb, cs, co, cpz, st) = row
                     total = cp + cb + cs + co + cpz
                     ltotal += total
                     parts = []
@@ -344,11 +349,10 @@ def handle_message(event, vk):
                     if cs: parts.append(f"⭐{cs}")
                     if co: parts.append(f"♿{co}")
                     if cpz: parts.append(f"🚌{cpz}")
-                    reply += f"🏫 {class_name}: {' + '.join(parts)} = {total}\n"
+                    reply += f"🏫 {cn}: {' + '.join(parts)} = {total}\n"
                 reply += f"ИТОГО: {ltotal} чел.\n\n"
             else:
                 reply += "🌞 ОБЕДЫ: нет\n\n"
-            
             reply += f"👥 ВСЕГО: {btotal + ltotal} чел."
             send(vk, from_id, reply, get_main_keyboard())
             return
@@ -358,15 +362,13 @@ def handle_message(event, vk):
             show_my_orders(vk, from_id, user_id)
             return
 
-        # === РЕДАКТИРОВАНИЕ ЗАКАЗА ===
+        # === РЕДАКТИРОВАНИЕ ===
         if from_id in temp_data and temp_data[from_id].get("step") == "editing":
             order_id = temp_data[from_id]["order_id"]
-            
             if msg == "🔙 Назад":
                 del temp_data[from_id]
                 send(vk, from_id, "Главное меню:", get_main_keyboard())
                 return
-            
             if msg == "🗑 Удалить заказ":
                 if delete_order(order_id):
                     del temp_data[from_id]
@@ -374,20 +376,13 @@ def handle_message(event, vk):
                 else:
                     send(vk, from_id, "❌ Ошибка удаления.", get_main_keyboard())
                 return
-            
             categories = {
-                "💳 +1": ("count_plat", 1),
-                "💳 -1": ("count_plat", -1),
-                "🆓 +1": ("count_bes", 1),
-                "🆓 -1": ("count_bes", -1),
-                "⭐ +1": ("count_svo", 1),
-                "⭐ -1": ("count_svo", -1),
-                "♿ +1": ("count_ovz", 1),
-                "♿ -1": ("count_ovz", -1),
-                "🚌 +1": ("count_podvoz", 1),
-                "🚌 -1": ("count_podvoz", -1),
+                "💳 +1": ("count_plat", 1), "💳 -1": ("count_plat", -1),
+                "🆓 +1": ("count_bes", 1), "🆓 -1": ("count_bes", -1),
+                "⭐ +1": ("count_svo", 1), "⭐ -1": ("count_svo", -1),
+                "♿ +1": ("count_ovz", 1), "♿ -1": ("count_ovz", -1),
+                "🚌 +1": ("count_podvoz", 1), "🚌 -1": ("count_podvoz", -1),
             }
-            
             if msg in categories:
                 cat, delta = categories[msg]
                 if update_order_count(order_id, cat, delta):
@@ -399,34 +394,23 @@ def handle_message(event, vk):
                         cur.execute("SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE id = %s", (order_id,))
                     row = cur.fetchone()
                     conn.close()
-                    
                     if row:
                         cn, mt, cp, cb, cs, co, cpz = row
                         total = cp + cb + cs + co + cpz
-                        reply = (
-                            f"📝 ЗАКАЗ #{order_id}\n\n"
-                            f"🏫 Класс: {cn}\n"
-                            f"🍽 Приём: {mt}\n\n"
-                            f"💳 Платники: {cp}\n"
-                            f"🆓 Бесплатники: {cb}\n"
-                            f"⭐ СВО: {cs}\n"
-                            f"♿ ОВЗ: {co}\n"
-                            f"🚌 Подвоз: {cpz}\n\n"
-                            f"👥 Всего: {total} чел.\n\n"
-                            f"Что изменить?"
-                        )
+                        reply = (f"📝 ЗАКАЗ #{order_id}\n\n🏫 Класс: {cn}\n🍽 Приём: {mt}\n\n"
+                                 f"💳 Платники: {cp}\n🆓 Бесплатники: {cb}\n⭐ СВО: {cs}\n♿ ОВЗ: {co}\n🚌 Подвоз: {cpz}\n\n"
+                                 f"👥 Всего: {total} чел.\n\nЧто изменить?")
                         send(vk, from_id, reply, get_edit_keyboard(order_id))
                 else:
                     send(vk, from_id, "❌ Ошибка обновления.", get_main_keyboard())
                 return
-            
             if msg.startswith("#") or msg.isdigit():
                 new_id = int(msg.replace("#", ""))
                 temp_data[from_id]["order_id"] = new_id
                 send(vk, from_id, f"📝 Редактируешь заказ #{new_id}", get_edit_keyboard(new_id))
                 return
 
-        # === ВЫБОР ЗАКАЗА ДЛЯ РЕДАКТИРОВАНИЯ ===
+        # === ВЫБОР ЗАКАЗА ===
         if msg.startswith("#") or (msg.isdigit() and len(msg) <= 5):
             order_id = int(msg.replace("#", ""))
             temp_data[from_id] = {"step": "editing", "order_id": order_id}
@@ -459,58 +443,99 @@ def handle_message(event, vk):
                     send(vk, from_id, "Не понял дату. Выбери кнопку или напиши ГГГГ-ММ-ДД:", get_date_keyboard())
                     return
                 temp_data[from_id]["date"] = date_str
-                temp_data[from_id]["step"] = "counts"
+                temp_data[from_id]["step"] = "category"
+                temp_data[from_id]["names_plat"] = []
+                temp_data[from_id]["names_bes"] = []
+                temp_data[from_id]["names_svo"] = []
+                temp_data[from_id]["names_ovz"] = []
+                temp_data[from_id]["names_podvoz"] = []
                 send(vk, from_id,
-                     "👥 Шаг 3. Напиши количество по категориям через запятую:\n\n"
-                     "ПЛАТНИКИ, БЕСПЛАТНИКИ, СВО, ОВЗ, ПОДВОЗ\n\n"
-                     "Пример: 10, 5, 2, 1, 3",
-                     None)
+                     "👥 Шаг 3. Выбери категорию, а потом напиши ФАМИЛИИ через запятую.\n\n"
+                     "Пример: Иванов, Петров, Сидоров\n\n"
+                     "Когда закончишь — нажми ✅ Готово",
+                     get_category_keyboard())
                 return
             
-            if step == "counts":
-                try:
-                    parts = [int(p.strip()) for p in msg.split(',')]
-                    if len(parts) != 5:
-                        send(vk, from_id, "Нужно 5 чисел: платники, бесплатники, СВО, ОВЗ, подвоз.\nПример: 10, 5, 2, 1, 3", None)
-                        return
-                    cp, cb, cs, co, cpz = parts
-                    if min(parts) < 0:
-                        send(vk, from_id, "Количество не может быть отрицательным.", None)
-                        return
-                    if sum(parts) == 0:
-                        send(vk, from_id, "Укажи хотя бы одного ученика.", None)
+            if step == "category":
+                if msg == "✅ Готово":
+                    # Проверяем, есть ли хоть кто-то
+                    total_names = (len(temp_data[from_id]["names_plat"]) + len(temp_data[from_id]["names_bes"]) +
+                                   len(temp_data[from_id]["names_svo"]) + len(temp_data[from_id]["names_ovz"]) +
+                                   len(temp_data[from_id]["names_podvoz"]))
+                    if total_names == 0:
+                        send(vk, from_id, "Ты не ввёл ни одной фамилии. Напиши кого-нибудь или нажми категорию.", get_category_keyboard())
                         return
                     
                     class_name = temp_data[from_id]["class_name"]
                     date_str = temp_data[from_id]["date"]
                     meal_type = temp_data[from_id]["meal_type"]
                     
-                    create_order(user_id, class_name, date_str, meal_type, cp, cb, cs, co, cpz)
+                    np = ", ".join(temp_data[from_id]["names_plat"])
+                    nb = ", ".join(temp_data[from_id]["names_bes"])
+                    ns = ", ".join(temp_data[from_id]["names_svo"])
+                    no = ", ".join(temp_data[from_id]["names_ovz"])
+                    npz = ", ".join(temp_data[from_id]["names_podvoz"])
                     
-                    total = sum(parts)
+                    cp = len(temp_data[from_id]["names_plat"])
+                    cb = len(temp_data[from_id]["names_bes"])
+                    cs = len(temp_data[from_id]["names_svo"])
+                    co = len(temp_data[from_id]["names_ovz"])
+                    cpz = len(temp_data[from_id]["names_podvoz"])
+                    
+                    create_order(user_id, class_name, date_str, meal_type, cp, cb, cs, co, cpz, np, nb, ns, no, npz)
+                    
+                    total = cp + cb + cs + co + cpz
                     reply = (
                         f"✅ ЗАКАЗ ОФОРМЛЕН!\n\n"
-                        f"Класс: {class_name}\n"
-                        f"Дата: {date_str}\n"
-                        f"Приём: {meal_type}\n"
-                        f"💳 Платников: {cp}\n"
-                        f"🆓 Бесплатников: {cb}\n"
-                        f"⭐ СВО: {cs}\n"
-                        f"♿ ОВЗ: {co}\n"
-                        f"🚌 Подвоз: {cpz}\n"
-                        f"Всего: {total} чел.\n\n"
-                        f"Можешь изменить заказ в разделе «✏️ Мои заказы»"
+                        f"Класс: {class_name}\nДата: {date_str}\nПриём: {meal_type}\n\n"
+                        f"💳 Платники ({cp}): {np if np else '—'}\n"
+                        f"🆓 Бесплатники ({cb}): {nb if nb else '—'}\n"
+                        f"⭐ СВО ({cs}): {ns if ns else '—'}\n"
+                        f"♿ ОВЗ ({co}): {no if no else '—'}\n"
+                        f"🚌 Подвоз ({cpz}): {npz if npz else '—'}\n\n"
+                        f"👥 Всего: {total} чел."
                     )
                     send(vk, from_id, reply, get_main_keyboard())
                     del temp_data[from_id]
-                except ValueError:
-                    send(vk, from_id, "Ошибка! Пиши 5 чисел через запятую. Пример: 10, 5, 2, 1, 3", None)
+                    return
+                
+                # Выбор категории
+                if msg == "💳 Платники":
+                    temp_data[from_id]["current_category"] = "plat"
+                    send(vk, from_id, "💳 Напиши ФАМИЛИИ платников через запятую:", None)
+                    return
+                if msg == "🆓 Бесплатники":
+                    temp_data[from_id]["current_category"] = "bes"
+                    send(vk, from_id, "🆓 Напиши ФАМИЛИИ бесплатников через запятую:", None)
+                    return
+                if msg == "⭐ СВО":
+                    temp_data[from_id]["current_category"] = "svo"
+                    send(vk, from_id, "⭐ Напиши ФАМИЛИИ СВО через запятую:", None)
+                    return
+                if msg == "♿ ОВЗ":
+                    temp_data[from_id]["current_category"] = "ovz"
+                    send(vk, from_id, "♿ Напиши ФАМИЛИИ ОВЗ через запятую:", None)
+                    return
+                if msg == "🚌 Подвоз":
+                    temp_data[from_id]["current_category"] = "podvoz"
+                    send(vk, from_id, "🚌 Напиши ФАМИЛИИ подвоза через запятую:", None)
+                    return
+                
+                # Если это список фамилий
+                if "current_category" in temp_data[from_id]:
+                    cat = temp_data[from_id]["current_category"]
+                    names = [n.strip() for n in msg.split(',') if n.strip()]
+                    temp_data[from_id][f"names_{cat}"].extend(names)
+                    
+                    total_in_cat = len(temp_data[from_id][f"names_{cat}"])
+                    cat_names = {"plat": "💳 Платники", "bes": "🆓 Бесплатники", "svo": "⭐ СВО", "ovz": "♿ ОВЗ", "podvoz": "🚌 Подвоз"}
+                    send(vk, from_id, f"✅ Добавлено {len(names)} чел. в {cat_names[cat]}.\nВсего в категории: {total_in_cat}\n\nВыбери следующую категорию или нажми ✅ Готово:", get_category_keyboard())
+                    return
+                
+                send(vk, from_id, "Выбери категорию кнопкой ниже:", get_category_keyboard())
                 return
 
-        # === FALLBACK ===
-        send(vk, from_id,
-             "📌 Выбери действие на клавиатуре 👇",
-             get_main_keyboard())
+        send(vk, from_id, "📌 Выбери действие на клавиатуре 👇", get_main_keyboard())
 
     except Exception as e:
         print(f"❌ ОШИБКА: {e}")
