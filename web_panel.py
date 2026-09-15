@@ -1,10 +1,24 @@
-from flask import Flask, render_template_string, request
+import threading
 import os
 import datetime
 import urllib.parse
+from flask import Flask, render_template_string, request
+
+# === ЗАПУСК БОТА В ФОНЕ ===
+def run_bot():
+    try:
+        os.system("python bot.py")
+    except Exception as e:
+        print(f"❌ Бот упал: {e}")
+
+# Запускаем бота при старте веб-панели
+bot_thread = threading.Thread(target=run_bot, daemon=True)
+bot_thread.start()
+print("🚀 Бот запущен в фоне")
 
 app = Flask(__name__)
 
+# === ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ ===
 def get_db_connection():
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
@@ -22,6 +36,7 @@ def get_db_connection():
     )
     return conn, "postgresql"
 
+# === HTML ШАБЛОН ===
 HTML = """
 <!DOCTYPE html>
 <html>
@@ -165,10 +180,8 @@ def panel():
     raw = cur.fetchall()
     conn.close()
     
-    # Переставляем колонки: class_name, meal_type, cp, cb, cs, co, cpz, np, id, nb, ns, no, npz
     orders = []
     for r in raw:
-        # r = (id, class_name, meal_type, cp, cb, cs, co, cpz, np, nb, ns, no, npz, status)
         orders.append((
             r[1],   # class_name
             r[2],   # meal_type
