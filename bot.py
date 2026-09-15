@@ -10,7 +10,7 @@ import urllib.parse
 VK_TOKEN = "vk1.a.z1AGhRJTlOfwdx4ldltGvv10FPkpmfgUHproUb6uREpo0Ao2TH8PCldeXPDFY7O7qVVkd2NdhCtOd1EJ321WsxAXw_BfL8U13lkhK3JC77rUvMuHAhqiaGB4VPMFnMvb9qhEjWXyXwzf4RtQIshOIxxFbKUJUjaEQgX9aouqhvaHYM0zvVLzTDE_9qEmIlFVIE7x7oGrqNuTYDWXGj2T4A"
 GROUP_ID = 241386335
 
-# === ID СОТРУДНИКОВ (кто может редактировать и смотреть отчёт) ===
+# === ID СОТРУДНИКОВ (только они могут редактировать и смотреть отчёт) ===
 STAFF_IDS = [523723395, 768610229, 165518301]
 
 # === ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ ===
@@ -204,32 +204,6 @@ def update_order_names(order_id, category, names_str, count):
     finally:
         conn.close()
 
-def update_order_count(order_id, category, delta):
-    conn, db_type = get_db_connection()
-    cur = conn.cursor()
-    try:
-        if db_type == "sqlite":
-            cur.execute(f"SELECT {category} FROM orders WHERE id = ?", (order_id,))
-            row = cur.fetchone()
-            if not row:
-                return False
-            new_val = max(0, row[0] + delta)
-            cur.execute(f"UPDATE orders SET {category} = ? WHERE id = ?", (new_val, order_id))
-        else:
-            cur.execute(f"SELECT {category} FROM orders WHERE id = %s", (order_id,))
-            row = cur.fetchone()
-            if not row:
-                return False
-            new_val = max(0, row[0] + delta)
-            cur.execute(f"UPDATE orders SET {category} = %s WHERE id = %s", (new_val, order_id))
-        conn.commit()
-        return True
-    except Exception as e:
-        print(f"❌ Ошибка обновления: {e}")
-        return False
-    finally:
-        conn.close()
-
 def delete_order(order_id):
     conn, db_type = get_db_connection()
     cur = conn.cursor()
@@ -265,15 +239,17 @@ def parse_date(text):
     return None
 
 # === КЛАВИАТУРЫ ===
-def get_main_keyboard():
+def get_main_keyboard(from_id):
+    """Клавиатура зависит от того, сотрудник это или нет"""
     keyboard = VkKeyboard(one_time=False)
     keyboard.add_button("🌅 Завтрак", color=VkKeyboardColor.SECONDARY)
     keyboard.add_button("🌞 Обед", color=VkKeyboardColor.SECONDARY)
     keyboard.add_line()
     keyboard.add_button("✏️ Мои заказы", color=VkKeyboardColor.SECONDARY)
-    keyboard.add_button("📋 Отчёт", color=VkKeyboardColor.POSITIVE)
-    keyboard.add_line()
-    keyboard.add_button("🛠 Редактировать", color=VkKeyboardColor.PRIMARY)
+    if from_id in STAFF_IDS:
+        keyboard.add_button("📋 Отчёт", color=VkKeyboardColor.POSITIVE)
+        keyboard.add_line()
+        keyboard.add_button("🛠 Редактировать", color=VkKeyboardColor.PRIMARY)
     return keyboard.get_keyboard()
 
 def get_date_keyboard():
@@ -327,7 +303,7 @@ def send(vk, user_id, message, keyboard=None):
 def show_my_orders(vk, from_id, user_id):
     orders = get_user_orders_today(user_id)
     if not orders:
-        send(vk, from_id, "У тебя нет заказов на сегодня.", get_main_keyboard())
+        send(vk, from_id, "У тебя нет заказов на сегодня.", get_main_keyboard(from_id))
         return
     reply = "📋 ТВОИ ЗАКАЗЫ НА СЕГОДНЯ:\n\n"
     for o in orders:
@@ -335,13 +311,13 @@ def show_my_orders(vk, from_id, user_id):
         total = cp + cb + cs + co + cpz
         reply += f"#{order_id} 🏫 {class_name} ({meal_type}): {total} чел.\n"
         reply += f"  Платники: {cp} | Бесплатники: {cb} | СВО: {cs} | ОВЗ: {co} | Подвоз: {cpz}\n\n"
-    reply += "Напиши номер заказа (#ID) чтобы изменить его."
-    send(vk, from_id, reply, get_main_keyboard())
+    reply += "Напиши номер заказа (#ID) чтобы посмотреть."
+    send(vk, from_id, reply, get_main_keyboard(from_id))
 
 def show_all_orders(vk, from_id):
     rows = get_all_orders_today()
     if not rows:
-        send(vk, from_id, "Заказов на сегодня нет.", get_main_keyboard())
+        send(vk, from_id, "Заказов на сегодня нет.", get_main_keyboard(from_id))
         return
     reply = "📋 ВСЕ ЗАКАЗЫ НА СЕГОДНЯ:\n\n"
     for r in rows:
@@ -350,7 +326,7 @@ def show_all_orders(vk, from_id):
         reply += f"#{order_id} 🏫 {cn} ({mt}): {total} чел.\n"
         reply += f"  Платники: {cp} | Бесплатники: {cb} | СВО: {cs} | ОВЗ: {co} | Подвоз: {cpz}\n\n"
     reply += "Напиши номер заказа (#ID), чтобы редактировать."
-    send(vk, from_id, reply, get_main_keyboard())
+    send(vk, from_id, reply, get_main_keyboard(from_id))
 
 def handle_message(event, vk):
     try:
@@ -365,15 +341,15 @@ def handle_message(event, vk):
         user_data = get_user(from_id)
         if not user_data:
             add_user(from_id, name)
-            send(vk, from_id, "👋 Привет! Заказывай питание на класс.\n\nВыбери действие 👇", get_main_keyboard())
+            send(vk, from_id, "👋 Привет! Заказывай питание на класс.\n\nВыбери действие 👇", get_main_keyboard(from_id))
             return
 
         user_id = user_data[0]
 
-        # === ОТЧЁТ ===
+        # === ОТЧЁТ (только сотрудники) ===
         if msg_lower.startswith("отчёт") or msg_lower.startswith("!стафф") or msg == "📋 Отчёт":
             if from_id not in STAFF_IDS:
-                send(vk, from_id, "Доступ запрещён.", get_main_keyboard())
+                send(vk, from_id, "Доступ запрещён.", get_main_keyboard(from_id))
                 return
             conn, db_type = get_db_connection()
             cur = conn.cursor()
@@ -384,7 +360,7 @@ def handle_message(event, vk):
             rows = cur.fetchall()
             conn.close()
             if not rows:
-                send(vk, from_id, "Заказов на сегодня нет.", get_main_keyboard())
+                send(vk, from_id, "Заказов на сегодня нет.", get_main_keyboard(from_id))
                 return
             breakfast, lunch = [], []
             for row in rows:
@@ -428,7 +404,7 @@ def handle_message(event, vk):
             else:
                 reply += "🌞 ОБЕДЫ: нет\n\n"
             reply += f"👥 ВСЕГО: {btotal + ltotal} чел."
-            send(vk, from_id, reply, get_main_keyboard())
+            send(vk, from_id, reply, get_main_keyboard(from_id))
             return
 
         # === МОИ ЗАКАЗЫ ===
@@ -436,22 +412,27 @@ def handle_message(event, vk):
             show_my_orders(vk, from_id, user_id)
             return
 
-        # === РЕДАКТИРОВАНИЕ СОТРУДНИКОМ ===
+        # === РЕДАКТИРОВАНИЕ ТОЛЬКО ДЛЯ СОТРУДНИКОВ ===
         if msg == "🛠 Редактировать":
             if from_id not in STAFF_IDS:
-                send(vk, from_id, "Доступ запрещён.", get_main_keyboard())
+                send(vk, from_id, "Доступ запрещён. Только сотрудники могут редактировать заказы.", get_main_keyboard(from_id))
                 return
             show_all_orders(vk, from_id)
             return
 
         if from_id in temp_data and temp_data[from_id].get("step", "").startswith("staff_edit"):
+            if from_id not in STAFF_IDS:
+                send(vk, from_id, "Доступ запрещён.", get_main_keyboard(from_id))
+                del temp_data[from_id]
+                return
+            
             step = temp_data[from_id]["step"]
             order_id = temp_data[from_id]["order_id"]
 
             if step == "staff_edit_category":
                 if msg == "🔙 Назад":
                     del temp_data[from_id]
-                    send(vk, from_id, "Главное меню:", get_main_keyboard())
+                    send(vk, from_id, "Главное меню:", get_main_keyboard(from_id))
                     return
                 cat_map = {"Платники": "plat", "Бесплатники": "bes", "СВО": "svo", "ОВЗ": "ovz", "Подвоз": "podvoz"}
                 if msg in cat_map:
@@ -498,9 +479,9 @@ def handle_message(event, vk):
                 if update_order_names(order_id, cat, names_str, count):
                     send(vk, from_id,
                          f"✅ Добавлено {len(new_names)} чел.\n\nТеперь в категории ({count} чел.):\n{names_str}",
-                         get_main_keyboard())
+                         get_main_keyboard(from_id))
                 else:
-                    send(vk, from_id, "❌ Ошибка сохранения.", get_main_keyboard())
+                    send(vk, from_id, "❌ Ошибка сохранения.", get_main_keyboard(from_id))
                 del temp_data[from_id]
                 return
 
@@ -521,21 +502,20 @@ def handle_message(event, vk):
                 if update_order_names(order_id, cat, names_str, count):
                     send(vk, from_id,
                          f"✅ Удалено {len(removed)} чел.\n\nОсталось ({count} чел.):\n{names_str if names_str else '—'}",
-                         get_main_keyboard())
+                         get_main_keyboard(from_id))
                 else:
-                    send(vk, from_id, "❌ Ошибка сохранения.", get_main_keyboard())
+                    send(vk, from_id, "❌ Ошибка сохранения.", get_main_keyboard(from_id))
                 del temp_data[from_id]
                 return
 
-        # === ВЫБОР ЗАКАЗА ===
+        # === ВЫБОР ЗАКАЗА (только сотрудники могут редактировать) ===
         if msg.startswith("#") or (msg.isdigit() and len(msg) <= 5):
             order_id = int(msg.replace("#", ""))
             if from_id in STAFF_IDS:
                 temp_data[from_id] = {"step": "staff_edit_category", "order_id": order_id}
                 send(vk, from_id, f"📝 Редактируешь заказ #{order_id}\n\nВыбери категорию:", get_edit_category_keyboard())
             else:
-                temp_data[from_id] = {"step": "editing", "order_id": order_id}
-                send(vk, from_id, f"📝 Заказ #{order_id}\n\nНапиши номер категории для изменения или подожди.", get_main_keyboard())
+                send(vk, from_id, "Только сотрудники могут редактировать заказы.", get_main_keyboard(from_id))
             return
 
         # === БЫСТРЫЕ КНОПКИ ===
@@ -610,7 +590,7 @@ def handle_message(event, vk):
                         f"Подвоз ({cpz}): {npz if npz else '—'}\n\n"
                         f"👥 Всего: {total} чел."
                     )
-                    send(vk, from_id, reply, get_main_keyboard())
+                    send(vk, from_id, reply, get_main_keyboard(from_id))
                     del temp_data[from_id]
                     return
                 
@@ -647,12 +627,12 @@ def handle_message(event, vk):
                 send(vk, from_id, "Выбери категорию кнопкой ниже:", get_category_keyboard())
                 return
 
-        send(vk, from_id, "📌 Выбери действие на клавиатуре 👇", get_main_keyboard())
+        send(vk, from_id, "📌 Выбери действие на клавиатуре 👇", get_main_keyboard(from_id))
 
     except Exception as e:
         print(f"❌ ОШИБКА: {e}")
         try:
-            send(vk, from_id, "Произошла ошибка. Попробуй ещё раз.", get_main_keyboard())
+            send(vk, from_id, "Произошла ошибка. Попробуй ещё раз.", get_main_keyboard(from_id))
         except:
             pass
 
