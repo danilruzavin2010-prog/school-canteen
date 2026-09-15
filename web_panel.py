@@ -11,7 +11,6 @@ def run_bot():
     except Exception as e:
         print(f"❌ Бот упал: {e}")
 
-# Запускаем бота при старте веб-панели
 bot_thread = threading.Thread(target=run_bot, daemon=True)
 bot_thread.start()
 print("🚀 Бот запущен в фоне")
@@ -46,7 +45,7 @@ HTML = """
     <title>🍽 Панель столовой</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 10px; background: #f5f5f5; }
-        .container { max-width: 1100px; margin: 0 auto; background: white; padding: 16px; border-radius: 12px; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 16px; border-radius: 12px; }
         h1 { font-size: 20px; }
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
         th { background: #4CAF50; color: white; padding: 8px 4px; }
@@ -67,7 +66,7 @@ HTML = """
         .names-btn { cursor: pointer; color: #1976D2; text-decoration: underline; font-size: 11px; }
         .names-block { display: none; text-align: left; font-size: 12px; padding: 8px; background: #fafafa; border-radius: 6px; margin-top: 4px; }
         .names-block.show { display: block; }
-        .names-block b { display: inline-block; min-width: 100px; }
+        .names-block b { display: inline-block; min-width: 120px; }
         @media (max-width: 700px) {
             table { font-size: 11px; }
             th, td { padding: 4px 2px; }
@@ -92,9 +91,15 @@ HTML = """
 
     <table>
         <tr>
-            <th>Класс</th><th>Приём</th>
-            <th>💳</th><th>🆓</th><th>⭐</th><th>♿</th><th>🚌</th>
-            <th>Всего</th><th>Фамилии</th>
+            <th>Класс</th>
+            <th>Приём</th>
+            <th>Платники</th>
+            <th>Бесплатники</th>
+            <th>СВО</th>
+            <th>ОВЗ</th>
+            <th>Подвоз</th>
+            <th>Всего</th>
+            <th>Фамилии</th>
         </tr>
         {% for row in orders %}
         <tr>
@@ -109,21 +114,11 @@ HTML = """
             <td>
                 <span class="names-btn" onclick="toggleNames({{ row[8] }})">показать</span>
                 <div class="names-block" id="names-{{ row[8] }}">
-                    {% if row[7] %}
-                        <div><b>💳 Платники:</b> {{ row[7] }}</div>
-                    {% endif %}
-                    {% if row[9] %}
-                        <div><b>🆓 Бесплатники:</b> {{ row[9] }}</div>
-                    {% endif %}
-                    {% if row[10] %}
-                        <div><b>⭐ СВО:</b> {{ row[10] }}</div>
-                    {% endif %}
-                    {% if row[11] %}
-                        <div><b>♿ ОВЗ:</b> {{ row[11] }}</div>
-                    {% endif %}
-                    {% if row[12] %}
-                        <div><b>🚌 Подвоз:</b> {{ row[12] }}</div>
-                    {% endif %}
+                    {% if row[7] %}<div><b>Платники:</b> {{ row[7] }}</div>{% endif %}
+                    {% if row[9] %}<div><b>Бесплатники:</b> {{ row[9] }}</div>{% endif %}
+                    {% if row[10] %}<div><b>СВО:</b> {{ row[10] }}</div>{% endif %}
+                    {% if row[11] %}<div><b>ОВЗ:</b> {{ row[11] }}</div>{% endif %}
+                    {% if row[12] %}<div><b>Подвоз:</b> {{ row[12] }}</div>{% endif %}
                 </div>
             </td>
         </tr>
@@ -132,11 +127,13 @@ HTML = """
 
     <div class="totals">
         <p>👥 Всего порций: <span>{{ total_people }}</span></p>
-        <p>💳 Платники: <span class="plat">{{ total_plat }}</span> | 
-           🆓 Бесплатники: <span class="bes">{{ total_bes }}</span> | 
-           ⭐ СВО: <span class="svo">{{ total_svo }}</span> | 
-           ♿ ОВЗ: <span class="ovz">{{ total_ovz }}</span> | 
-           🚌 Подвоз: <span class="podvoz">{{ total_podvoz }}</span></p>
+        <p>
+            Платники: <span class="plat">{{ total_plat }}</span> | 
+            Бесплатники: <span class="bes">{{ total_bes }}</span> | 
+            СВО: <span class="svo">{{ total_svo }}</span> | 
+            ОВЗ: <span class="ovz">{{ total_ovz }}</span> | 
+            Подвоз: <span class="podvoz">{{ total_podvoz }}</span>
+        </p>
     </div>
 
     <form method="GET" class="date-form">
@@ -183,19 +180,8 @@ def panel():
     orders = []
     for r in raw:
         orders.append((
-            r[1],   # class_name
-            r[2],   # meal_type
-            r[3],   # count_plat
-            r[4],   # count_bes
-            r[5],   # count_svo
-            r[6],   # count_ovz
-            r[7],   # count_podvoz
-            r[8],   # names_plat
-            r[0],   # id (для toggle)
-            r[9],   # names_bes
-            r[10],  # names_svo
-            r[11],  # names_ovz
-            r[12],  # names_podvoz
+            r[1], r[2], r[3], r[4], r[5], r[6], r[7],
+            r[8], r[0], r[9], r[10], r[11], r[12],
         ))
     
     total_plat = sum(o[2] for o in orders)
