@@ -31,6 +31,7 @@ def get_db_connection():
 def init_db():
     conn, db_type = get_db_connection()
     cur = conn.cursor()
+    
     if db_type == "sqlite":
         cur.executescript('''
             CREATE TABLE IF NOT EXISTS users (
@@ -87,6 +88,23 @@ def init_db():
                 status TEXT DEFAULT 'новый'
             );
         ''')
+        
+        # === АВТОМАТИЧЕСКОЕ ДОБАВЛЕНИЕ КОЛОНОК, ЕСЛИ ИХ НЕТ ===
+        columns_to_add = [
+            ("count_podvoz", "INTEGER DEFAULT 0"),
+            ("names_plat", "TEXT DEFAULT ''"),
+            ("names_bes", "TEXT DEFAULT ''"),
+            ("names_svo", "TEXT DEFAULT ''"),
+            ("names_ovz", "TEXT DEFAULT ''"),
+            ("names_podvoz", "TEXT DEFAULT ''"),
+        ]
+        for col, col_type in columns_to_add:
+            try:
+                cur.execute(f"ALTER TABLE orders ADD COLUMN IF NOT EXISTS {col} {col_type}")
+                print(f"✅ Колонка {col} проверена/добавлена")
+            except Exception as e:
+                print(f"⚠️ Колонка {col}: {e}")
+    
     conn.commit()
     conn.close()
     print("✅ База данных инициализирована")
@@ -458,7 +476,6 @@ def handle_message(event, vk):
             
             if step == "category":
                 if msg == "✅ Готово":
-                    # Проверяем, есть ли хоть кто-то
                     total_names = (len(temp_data[from_id]["names_plat"]) + len(temp_data[from_id]["names_bes"]) +
                                    len(temp_data[from_id]["names_svo"]) + len(temp_data[from_id]["names_ovz"]) +
                                    len(temp_data[from_id]["names_podvoz"]))
@@ -499,7 +516,6 @@ def handle_message(event, vk):
                     del temp_data[from_id]
                     return
                 
-                # Выбор категории
                 if msg == "💳 Платники":
                     temp_data[from_id]["current_category"] = "plat"
                     send(vk, from_id, "💳 Напиши ФАМИЛИИ платников через запятую:", None)
@@ -521,7 +537,6 @@ def handle_message(event, vk):
                     send(vk, from_id, "🚌 Напиши ФАМИЛИИ подвоза через запятую:", None)
                     return
                 
-                # Если это список фамилий
                 if "current_category" in temp_data[from_id]:
                     cat = temp_data[from_id]["current_category"]
                     names = [n.strip() for n in msg.split(',') if n.strip()]
