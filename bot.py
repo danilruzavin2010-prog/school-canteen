@@ -10,8 +10,8 @@ import urllib.parse
 VK_TOKEN = "vk1.a.z1AGhRJTlOfwdx4ldltGvv10FPkpmfgUHproUb6uREpo0Ao2TH8PCldeXPDFY7O7qVVkd2NdhCtOd1EJ321WsxAXw_BfL8U13lkhK3JC77rUvMuHAhqiaGB4VPMFnMvb9qhEjWXyXwzf4RtQIshOIxxFbKUJUjaEQgX9aouqhvaHYM0zvVLzTDE_9qEmIlFVIE7x7oGrqNuTYDWXGj2T4A"
 GROUP_ID = 241386335
 
-# === ID СОТРУДНИКОВ (только они могут редактировать и смотреть отчёт) ===
-STAFF_IDS = [523723395, 768610229, 165518301]
+# === ID СОТРУДНИКОВ (только они видят кнопки Отчёт и Редактировать) ===
+STAFF_IDS = [523723395, 768610229, 165518301, 2926579]
 
 # === ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ ===
 def get_db_connection():
@@ -246,10 +246,13 @@ def get_main_keyboard(from_id):
     keyboard.add_button("🌞 Обед", color=VkKeyboardColor.SECONDARY)
     keyboard.add_line()
     keyboard.add_button("✏️ Мои заказы", color=VkKeyboardColor.SECONDARY)
+    
+    # Кнопки только для сотрудников
     if from_id in STAFF_IDS:
         keyboard.add_button("📋 Отчёт", color=VkKeyboardColor.POSITIVE)
         keyboard.add_line()
         keyboard.add_button("🛠 Редактировать", color=VkKeyboardColor.PRIMARY)
+    
     return keyboard.get_keyboard()
 
 def get_date_keyboard():
@@ -412,10 +415,10 @@ def handle_message(event, vk):
             show_my_orders(vk, from_id, user_id)
             return
 
-        # === РЕДАКТИРОВАНИЕ ТОЛЬКО ДЛЯ СОТРУДНИКОВ ===
+        # === РЕДАКТИРОВАНИЕ (только сотрудники) ===
         if msg == "🛠 Редактировать":
             if from_id not in STAFF_IDS:
-                send(vk, from_id, "Доступ запрещён. Только сотрудники могут редактировать заказы.", get_main_keyboard(from_id))
+                send(vk, from_id, "Доступ запрещён.", get_main_keyboard(from_id))
                 return
             show_all_orders(vk, from_id)
             return
@@ -508,7 +511,7 @@ def handle_message(event, vk):
                 del temp_data[from_id]
                 return
 
-        # === ВЫБОР ЗАКАЗА (только сотрудники могут редактировать) ===
+        # === ВЫБОР ЗАКАЗА ===
         if msg.startswith("#") or (msg.isdigit() and len(msg) <= 5):
             order_id = int(msg.replace("#", ""))
             if from_id in STAFF_IDS:
