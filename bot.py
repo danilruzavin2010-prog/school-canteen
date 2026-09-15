@@ -118,7 +118,6 @@ def create_order(user_id, class_name, order_date, meal_type, count_plat, count_b
     conn.commit()
     conn.close()
 
-# === ПОЛУЧИТЬ ЗАКАЗЫ ПОЛЬЗОВАТЕЛЯ НА СЕГОДНЯ ===
 def get_user_orders_today(user_id):
     today = datetime.date.today().isoformat()
     conn, db_type = get_db_connection()
@@ -139,10 +138,7 @@ def get_user_orders_today(user_id):
     conn.close()
     return rows
 
-# === ИЗМЕНИТЬ КОЛИЧЕСТВО В ЗАКАЗЕ ===
 def update_order_count(order_id, category, delta):
-    """category: 'count_plat', 'count_bes', 'count_svo', 'count_ovz', 'count_podvoz'
-       delta: +1 или -1"""
     conn, db_type = get_db_connection()
     cur = conn.cursor()
     try:
@@ -168,7 +164,6 @@ def update_order_count(order_id, category, delta):
     finally:
         conn.close()
 
-# === УДАЛИТЬ ЗАКАЗ ===
 def delete_order(order_id):
     conn, db_type = get_db_connection()
     cur = conn.cursor()
@@ -206,19 +201,11 @@ def parse_date(text):
 # === КЛАВИАТУРЫ ===
 def get_main_keyboard():
     keyboard = VkKeyboard(one_time=False)
-    keyboard.add_button("🍽 Заказать на класс", color=VkKeyboardColor.PRIMARY)
-    keyboard.add_line()
     keyboard.add_button("🌅 Завтрак", color=VkKeyboardColor.SECONDARY)
     keyboard.add_button("🌞 Обед", color=VkKeyboardColor.SECONDARY)
     keyboard.add_line()
     keyboard.add_button("✏️ Мои заказы", color=VkKeyboardColor.SECONDARY)
     keyboard.add_button("📋 Отчёт", color=VkKeyboardColor.POSITIVE)
-    return keyboard.get_keyboard()
-
-def get_meal_keyboard():
-    keyboard = VkKeyboard(one_time=True)
-    keyboard.add_button("🌅 Завтрак", color=VkKeyboardColor.SECONDARY)
-    keyboard.add_button("🌞 Обед", color=VkKeyboardColor.SECONDARY)
     return keyboard.get_keyboard()
 
 def get_date_keyboard():
@@ -262,7 +249,6 @@ def send(vk, user_id, message, keyboard=None):
         params['keyboard'] = keyboard
     vk.messages.send(**params)
 
-# === ПОКАЗАТЬ МОИ ЗАКАЗЫ ===
 def show_my_orders(vk, from_id, user_id):
     orders = get_user_orders_today(user_id)
     if not orders:
@@ -389,7 +375,6 @@ def handle_message(event, vk):
                     send(vk, from_id, "❌ Ошибка удаления.", get_main_keyboard())
                 return
             
-            # Обработка кнопок +1/-1
             categories = {
                 "💳 +1": ("count_plat", 1),
                 "💳 -1": ("count_plat", -1),
@@ -406,7 +391,6 @@ def handle_message(event, vk):
             if msg in categories:
                 cat, delta = categories[msg]
                 if update_order_count(order_id, cat, delta):
-                    # Показать обновлённый заказ
                     conn, db_type = get_db_connection()
                     cur = conn.cursor()
                     if db_type == "sqlite":
@@ -436,7 +420,6 @@ def handle_message(event, vk):
                     send(vk, from_id, "❌ Ошибка обновления.", get_main_keyboard())
                 return
             
-            # Если введён другой номер заказа
             if msg.startswith("#") or msg.isdigit():
                 new_id = int(msg.replace("#", ""))
                 temp_data[from_id]["order_id"] = new_id
@@ -460,33 +443,14 @@ def handle_message(event, vk):
             send(vk, from_id, "🏫 Заказ на ОБЕД.\n\nНапиши название класса (например: 9А)", None)
             return
 
-        # === ЗАКАЗ НА КЛАСС ===
-        if msg_lower.startswith("заказать класс") or msg == "🍽 Заказать на класс":
-            temp_data[from_id] = {"step": "class_name"}
-            send(vk, from_id, "🏫 ЗАКАЗ НА КЛАСС\n\nШаг 1. Напиши название класса (например: 9А)", None)
-            return
-
         # === ДИАЛОГ ===
         if from_id in temp_data:
             step = temp_data[from_id].get("step")
             
             if step == "class_name":
                 temp_data[from_id]["class_name"] = msg.upper()
-                if "meal_type" not in temp_data[from_id]:
-                    temp_data[from_id]["step"] = "meal_type"
-                    send(vk, from_id, "🍽 Шаг 2. Выбери приём пищи:", get_meal_keyboard())
-                else:
-                    temp_data[from_id]["step"] = "date"
-                    send(vk, from_id, "📅 Шаг 2. Выбери дату:", get_date_keyboard())
-                return
-            
-            if step == "meal_type":
-                if msg_lower not in ["завтрак", "обед"]:
-                    send(vk, from_id, "Выбери: Завтрак или Обед", get_meal_keyboard())
-                    return
-                temp_data[from_id]["meal_type"] = msg_lower
                 temp_data[from_id]["step"] = "date"
-                send(vk, from_id, "📅 Шаг 3. Выбери дату:", get_date_keyboard())
+                send(vk, from_id, "📅 Шаг 2. Выбери дату:", get_date_keyboard())
                 return
             
             if step == "date":
@@ -497,7 +461,7 @@ def handle_message(event, vk):
                 temp_data[from_id]["date"] = date_str
                 temp_data[from_id]["step"] = "counts"
                 send(vk, from_id,
-                     "👥 Шаг 4. Напиши количество по категориям через запятую:\n\n"
+                     "👥 Шаг 3. Напиши количество по категориям через запятую:\n\n"
                      "ПЛАТНИКИ, БЕСПЛАТНИКИ, СВО, ОВЗ, ПОДВОЗ\n\n"
                      "Пример: 10, 5, 2, 1, 3",
                      None)
