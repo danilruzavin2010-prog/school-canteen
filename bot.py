@@ -10,7 +10,7 @@ import time
 # === КОНФИГ ===
 VK_TOKEN = "vk1.a.z1AGhRJTlOfwdx4ldltGvv10FPkpmfgUHproUb6uREpo0Ao2TH8PCldeXPDFY7O7qVVkd2NdhCtOd1EJ321WsxAXw_BfL8U13lkhK3JC77rUvMuHAhqiaGB4VPMFnMvb9qhEjWXyXwzf4RtQIshOIxxFbKUJUjaEQgX9aouqhvaHYM0zvVLzTDE_9qEmIlFVIE7x7oGrqNuTYDWXGj2T4A"
 GROUP_ID = 241386335
-STAFF_IDS = [523723395]
+STAFF_IDS = [523723395, 2926579, 165518301, 768610229]
 
 def get_db_connection():
     db_url = os.environ.get("DATABASE_URL")
