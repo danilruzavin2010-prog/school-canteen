@@ -10,10 +10,8 @@ import time
 # === КОНФИГ ===
 VK_TOKEN = "vk1.a.z1AGhRJTlOfwdx4ldltGvv10FPkpmfgUHproUb6uREpo0Ao2TH8PCldeXPDFY7O7qVVkd2NdhCtOd1EJ321WsxAXw_BfL8U13lkhK3JC77rUvMuHAhqiaGB4VPMFnMvb9qhEjWXyXwzf4RtQIshOIxxFbKUJUjaEQgX9aouqhvaHYM0zvVLzTDE_9qEmIlFVIE7x7oGrqNuTYDWXGj2T4A"
 GROUP_ID = 241386335
-
 STAFF_IDS = [523723395]
 
-# === ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ ===
 def get_db_connection():
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
@@ -222,7 +220,6 @@ def parse_date(text):
                 return None
     return None
 
-# === КЛАВИАТУРЫ ===
 def get_main_keyboard(from_id):
     keyboard = VkKeyboard(one_time=False)
     keyboard.add_button("🌅 Завтрак", color=VkKeyboardColor.SECONDARY)
@@ -497,142 +494,4 @@ def handle_message(event, vk):
             return
 
         if msg == "🌅 Завтрак":
-            temp_data[from_id] = {"step": "class_name", "meal_type": "завтрак"}
-            send(vk, from_id, "🏫 Заказ на ЗАВТРАК.\n\nНапиши название класса (например: 9А)", None)
-            return
-        if msg == "🌞 Обед":
-            temp_data[from_id] = {"step": "class_name", "meal_type": "обед"}
-            send(vk, from_id, "🏫 Заказ на ОБЕД.\n\nНапиши название класса (например: 9А)", None)
-            return
-
-        if from_id in temp_data:
-            step = temp_data[from_id].get("step")
-            
-            if step == "class_name":
-                temp_data[from_id]["class_name"] = msg.upper()
-                temp_data[from_id]["step"] = "date"
-                send(vk, from_id, "📅 Шаг 2. Выбери дату:", get_date_keyboard())
-                return
-            
-            if step == "date":
-                date_str = parse_date(msg)
-                if not date_str:
-                    send(vk, from_id, "Не понял дату. Выбери кнопку или напиши ГГГГ-ММ-ДД:", get_date_keyboard())
-                    return
-                temp_data[from_id]["date"] = date_str
-                temp_data[from_id]["step"] = "category"
-                temp_data[from_id]["names_plat"] = []
-                temp_data[from_id]["names_bes"] = []
-                temp_data[from_id]["names_svo"] = []
-                temp_data[from_id]["names_ovz"] = []
-                temp_data[from_id]["names_podvoz"] = []
-                send(vk, from_id,
-                     "👥 Шаг 3. Выбери категорию, а потом напиши ФАМИЛИИ через запятую.\n\n"
-                     "Пример: Иванов, Петров, Сидоров\n\n"
-                     "Когда закончишь — нажми ✅ Готово",
-                     get_category_keyboard())
-                return
-            
-            if step == "category":
-                if msg == "✅ Готово":
-                    total_names = (len(temp_data[from_id]["names_plat"]) + len(temp_data[from_id]["names_bes"]) +
-                                   len(temp_data[from_id]["names_svo"]) + len(temp_data[from_id]["names_ovz"]) +
-                                   len(temp_data[from_id]["names_podvoz"]))
-                    if total_names == 0:
-                        send(vk, from_id, "Ты не ввёл ни одной фамилии.", get_category_keyboard())
-                        return
-                    class_name = temp_data[from_id]["class_name"]
-                    date_str = temp_data[from_id]["date"]
-                    meal_type = temp_data[from_id]["meal_type"]
-                    np = ", ".join(temp_data[from_id]["names_plat"])
-                    nb = ", ".join(temp_data[from_id]["names_bes"])
-                    ns = ", ".join(temp_data[from_id]["names_svo"])
-                    no = ", ".join(temp_data[from_id]["names_ovz"])
-                    npz = ", ".join(temp_data[from_id]["names_podvoz"])
-                    cp = len(temp_data[from_id]["names_plat"])
-                    cb = len(temp_data[from_id]["names_bes"])
-                    cs = len(temp_data[from_id]["names_svo"])
-                    co = len(temp_data[from_id]["names_ovz"])
-                    cpz = len(temp_data[from_id]["names_podvoz"])
-                    create_order(user_id, class_name, date_str, meal_type, cp, cb, cs, co, cpz, np, nb, ns, no, npz)
-                    total = cp + cb + cs + co + cpz
-                    reply = (
-                        f"✅ ЗАКАЗ ОФОРМЛЕН!\n\n"
-                        f"Класс: {class_name}\nДата: {date_str}\nПриём: {meal_type}\n\n"
-                        f"Платники ({cp}): {np if np else '—'}\n"
-                        f"Бесплатники ({cb}): {nb if nb else '—'}\n"
-                        f"СВО ({cs}): {ns if ns else '—'}\n"
-                        f"ОВЗ ({co}): {no if no else '—'}\n"
-                        f"Подвоз ({cpz}): {npz if npz else '—'}\n\n"
-                        f"👥 Всего: {total} чел."
-                    )
-                    send(vk, from_id, reply, get_main_keyboard(from_id))
-                    del temp_data[from_id]
-                    return
-                
-                if msg == "💳 Платники":
-                    temp_data[from_id]["current_category"] = "plat"
-                    send(vk, from_id, "Напиши ФАМИЛИИ платников через запятую:", None)
-                    return
-                if msg == "🆓 Бесплатники":
-                    temp_data[from_id]["current_category"] = "bes"
-                    send(vk, from_id, "Напиши ФАМИЛИИ бесплатников через запятую:", None)
-                    return
-                if msg == "⭐ СВО":
-                    temp_data[from_id]["current_category"] = "svo"
-                    send(vk, from_id, "Напиши ФАМИЛИИ СВО через запятую:", None)
-                    return
-                if msg == "♿ ОВЗ":
-                    temp_data[from_id]["current_category"] = "ovz"
-                    send(vk, from_id, "Напиши ФАМИЛИИ ОВЗ через запятую:", None)
-                    return
-                if msg == "🚌 Подвоз":
-                    temp_data[from_id]["current_category"] = "podvoz"
-                    send(vk, from_id, "Напиши ФАМИЛИИ подвоза через запятую:", None)
-                    return
-                
-                if "current_category" in temp_data[from_id]:
-                    cat = temp_data[from_id]["current_category"]
-                    names = [n.strip() for n in msg.split(',') if n.strip()]
-                    temp_data[from_id][f"names_{cat}"].extend(names)
-                    total_in_cat = len(temp_data[from_id][f"names_{cat}"])
-                    cat_names = {"plat": "Платники", "bes": "Бесплатники", "svo": "СВО", "ovz": "ОВЗ", "podvoz": "Подвоз"}
-                    send(vk, from_id, f"✅ Добавлено {len(names)} чел. в {cat_names[cat]}.\nВсего: {total_in_cat}\n\nВыбери следующую категорию или нажми ✅ Готово:", get_category_keyboard())
-                    return
-                
-                send(vk, from_id, "Выбери категорию кнопкой ниже:", get_category_keyboard())
-                return
-
-        send(vk, from_id, "📌 Выбери действие на клавиатуре 👇", get_main_keyboard(from_id))
-
-    except Exception as e:
-        print(f"❌ ОШИБКА: {e}")
-        try:
-            send(vk, from_id, "Произошла ошибка. Попробуй ещё раз.", get_main_keyboard(from_id))
-        except:
-            pass
-
-if __name__ == "__main__":
-    init_db()
-    vk_session = vk_api.VkApi(token=VK_TOKEN)
-    vk = vk_session.get_api()
-    longpoll = VkBotLongPoll(vk_session, GROUP_ID)
-    print("🤖 SWILL BOT ACTIVE")
-    print("Жду сообщений...")
-    
-    # === ВЕЧНЫЙ ЦИКЛ С ПЕРЕПОДКЛЮЧЕНИЕМ ===
-    while True:
-        try:
-            for event in longpoll.listen():
-                if event.type == VkBotEventType.MESSAGE_NEW:
-                    handle_message(event, vk)
-        except Exception as e:
-            print(f"⚠️ Ошибка longpoll: {e}")
-            print("Переподключение через 10 секунд...")
-            time.sleep(10)
-            try:
-                longpoll = VkBotLongPoll(vk_session, GROUP_ID)
-                print("✅ Переподключено")
-            except Exception as e2:
-                print(f"❌ Не удалось переподключиться: {e2}")
-                time.sleep(30)
+            temp_data[from_id] = {"step

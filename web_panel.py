@@ -1,7 +1,25 @@
-from flask import Flask, render_template_string, request
+import threading
+import subprocess
+import time
 import os
 import datetime
 import urllib.parse
+from flask import Flask, render_template_string, request
+
+# === ЗАПУСК БОТА В ФОНЕ ===
+def run_bot():
+    while True:
+        try:
+            print("🚀 Запуск бота...")
+            subprocess.run(["python", "bot.py"])
+        except Exception as e:
+            print(f"❌ Бот упал: {e}")
+        print("⚠️ Бот завершился. Перезапуск через 5 секунд...")
+        time.sleep(5)
+
+bot_thread = threading.Thread(target=run_bot, daemon=True)
+bot_thread.start()
+print("🤖 Поток бота запущен")
 
 app = Flask(__name__)
 
