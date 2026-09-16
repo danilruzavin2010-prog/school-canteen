@@ -10,7 +10,7 @@ import time
 # === КОНФИГ ===
 VK_TOKEN = "vk1.a.z1AGhRJTlOfwdx4ldltGvv10FPkpmfgUHproUb6uREpo0Ao2TH8PCldeXPDFY7O7qVVkd2NdhCtOd1EJ321WsxAXw_BfL8U13lkhK3JC77rUvMuHAhqiaGB4VPMFnMvb9qhEjWXyXwzf4RtQIshOIxxFbKUJUjaEQgX9aouqhvaHYM0zvVLzTDE_9qEmIlFVIE7x7oGrqNuTYDWXGj2T4A"
 GROUP_ID = 241386335
-STAFF_IDS = [523723395, 2926579, 165518301, 768610229]
+STAFF_IDS = [523723395]
 
 def get_db_connection():
     db_url = os.environ.get("DATABASE_URL")
@@ -325,6 +325,7 @@ def handle_message(event, vk):
 
         user_id = user_data[0]
 
+        # === ОТЧЁТ (только сотрудники) ===
         if msg_lower.startswith("отчёт") or msg_lower.startswith("!стафф") or msg == "📋 Отчёт":
             if from_id not in STAFF_IDS:
                 send(vk, from_id, "Доступ запрещён.", get_main_keyboard(from_id))
@@ -385,10 +386,12 @@ def handle_message(event, vk):
             send(vk, from_id, reply, get_main_keyboard(from_id))
             return
 
+        # === МОИ ЗАКАЗЫ ===
         if msg == "✏️ Мои заказы" or msg_lower.startswith("мои заказы"):
             show_my_orders(vk, from_id, user_id)
             return
 
+        # === РЕДАКТИРОВАНИЕ (только сотрудники) ===
         if msg == "🛠 Редактировать":
             if from_id not in STAFF_IDS:
                 send(vk, from_id, "Доступ запрещён.", get_main_keyboard(from_id))
@@ -484,25 +487,27 @@ def handle_message(event, vk):
                 del temp_data[from_id]
                 return
 
-        if msg.startswith("#") or (msg.isdigit() and len(msg) <= 5):
-            order_id = int(msg.replace("#", ""))
-            if from_id in STAFF_IDS:
-                temp_data[from_id] = {"step": "staff_edit_category", "order_id": order_id}
-                send(vk, from_id, f"📝 Редактируешь заказ #{order_id}\n\nВыбери категорию:", get_edit_category_keyboard())
-            else:
+        # === ВЫБОР ЗАКАЗА (ТОЛЬКО ДЛЯ СОТРУДНИКОВ) ===
+        if msg.startswith("#"):
+            if from_id not in STAFF_IDS:
                 send(vk, from_id, "Только сотрудники могут редактировать заказы.", get_main_keyboard(from_id))
+                return
+            order_id = int(msg.replace("#", ""))
+            temp_data[from_id] = {"step": "staff_edit_category", "order_id": order_id}
+            send(vk, from_id, f"📝 Редактируешь заказ #{order_id}\n\nВыбери категорию:", get_edit_category_keyboard())
             return
 
+        # === БЫСТРЫЕ КНОПКИ ===
         if msg == "🌅 Завтрак":
             temp_data[from_id] = {"step": "class_name", "meal_type": "завтрак"}
             send(vk, from_id, "🏫 Заказ на ЗАВТРАК.\n\nНапиши название класса (например: 9А)", None)
             return
-
         if msg == "🌞 Обед":
             temp_data[from_id] = {"step": "class_name", "meal_type": "обед"}
             send(vk, from_id, "🏫 Заказ на ОБЕД.\n\nНапиши название класса (например: 9А)", None)
             return
 
+        # === ДИАЛОГ ===
         if from_id in temp_data:
             step = temp_data[from_id].get("step")
             
