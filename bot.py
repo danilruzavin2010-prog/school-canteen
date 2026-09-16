@@ -5,13 +5,13 @@ import datetime
 import os
 import re
 import urllib.parse
+import time
 
 # === КОНФИГ ===
 VK_TOKEN = "vk1.a.z1AGhRJTlOfwdx4ldltGvv10FPkpmfgUHproUb6uREpo0Ao2TH8PCldeXPDFY7O7qVVkd2NdhCtOd1EJ321WsxAXw_BfL8U13lkhK3JC77rUvMuHAhqiaGB4VPMFnMvb9qhEjWXyXwzf4RtQIshOIxxFbKUJUjaEQgX9aouqhvaHYM0zvVLzTDE_9qEmIlFVIE7x7oGrqNuTYDWXGj2T4A"
 GROUP_ID = 241386335
 
-# === ID СОТРУДНИКОВ (только они видят кнопки Отчёт и Редактировать) ===
-STAFF_IDS = [523723395, 768610229, 165518301, 2926579]
+STAFF_IDS = [523723395]
 
 # === ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ ===
 def get_db_connection():
@@ -204,22 +204,6 @@ def update_order_names(order_id, category, names_str, count):
     finally:
         conn.close()
 
-def delete_order(order_id):
-    conn, db_type = get_db_connection()
-    cur = conn.cursor()
-    try:
-        if db_type == "sqlite":
-            cur.execute("DELETE FROM orders WHERE id = ?", (order_id,))
-        else:
-            cur.execute("DELETE FROM orders WHERE id = %s", (order_id,))
-        conn.commit()
-        return True
-    except Exception as e:
-        print(f"❌ Ошибка удаления: {e}")
-        return False
-    finally:
-        conn.close()
-
 def parse_date(text):
     text = text.lower().strip()
     if text == "сегодня":
@@ -240,19 +224,15 @@ def parse_date(text):
 
 # === КЛАВИАТУРЫ ===
 def get_main_keyboard(from_id):
-    """Клавиатура зависит от того, сотрудник это или нет"""
     keyboard = VkKeyboard(one_time=False)
     keyboard.add_button("🌅 Завтрак", color=VkKeyboardColor.SECONDARY)
     keyboard.add_button("🌞 Обед", color=VkKeyboardColor.SECONDARY)
     keyboard.add_line()
     keyboard.add_button("✏️ Мои заказы", color=VkKeyboardColor.SECONDARY)
-    
-    # Кнопки только для сотрудников
     if from_id in STAFF_IDS:
         keyboard.add_button("📋 Отчёт", color=VkKeyboardColor.POSITIVE)
         keyboard.add_line()
         keyboard.add_button("🛠 Редактировать", color=VkKeyboardColor.PRIMARY)
-    
     return keyboard.get_keyboard()
 
 def get_date_keyboard():
@@ -314,7 +294,6 @@ def show_my_orders(vk, from_id, user_id):
         total = cp + cb + cs + co + cpz
         reply += f"#{order_id} 🏫 {class_name} ({meal_type}): {total} чел.\n"
         reply += f"  Платники: {cp} | Бесплатники: {cb} | СВО: {cs} | ОВЗ: {co} | Подвоз: {cpz}\n\n"
-    reply += "Напиши номер заказа (#ID) чтобы посмотреть."
     send(vk, from_id, reply, get_main_keyboard(from_id))
 
 def show_all_orders(vk, from_id):
@@ -349,7 +328,6 @@ def handle_message(event, vk):
 
         user_id = user_data[0]
 
-        # === ОТЧЁТ (только сотрудники) ===
         if msg_lower.startswith("отчёт") or msg_lower.startswith("!стафф") or msg == "📋 Отчёт":
             if from_id not in STAFF_IDS:
                 send(vk, from_id, "Доступ запрещён.", get_main_keyboard(from_id))
@@ -357,9 +335,9 @@ def handle_message(event, vk):
             conn, db_type = get_db_connection()
             cur = conn.cursor()
             if db_type == "sqlite":
-                cur.execute('''SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz, status FROM orders WHERE order_date = DATE('now')''')
+                cur.execute('''SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE order_date = DATE('now')''')
             else:
-                cur.execute('''SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz, status FROM orders WHERE order_date = CURRENT_DATE''')
+                cur.execute('''SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE order_date = CURRENT_DATE''')
             rows = cur.fetchall()
             conn.close()
             if not rows:
@@ -376,7 +354,7 @@ def handle_message(event, vk):
             if breakfast:
                 reply += "🌅 ЗАВТРАКИ:\n"
                 for row in breakfast:
-                    (cn, mt, cp, cb, cs, co, cpz, st) = row
+                    (cn, mt, cp, cb, cs, co, cpz) = row
                     total = cp + cb + cs + co + cpz
                     btotal += total
                     parts = []
@@ -393,7 +371,7 @@ def handle_message(event, vk):
             if lunch:
                 reply += "🌞 ОБЕДЫ:\n"
                 for row in lunch:
-                    (cn, mt, cp, cb, cs, co, cpz, st) = row
+                    (cn, mt, cp, cb, cs, co, cpz) = row
                     total = cp + cb + cs + co + cpz
                     ltotal += total
                     parts = []
@@ -410,12 +388,10 @@ def handle_message(event, vk):
             send(vk, from_id, reply, get_main_keyboard(from_id))
             return
 
-        # === МОИ ЗАКАЗЫ ===
         if msg == "✏️ Мои заказы" or msg_lower.startswith("мои заказы"):
             show_my_orders(vk, from_id, user_id)
             return
 
-        # === РЕДАКТИРОВАНИЕ (только сотрудники) ===
         if msg == "🛠 Редактировать":
             if from_id not in STAFF_IDS:
                 send(vk, from_id, "Доступ запрещён.", get_main_keyboard(from_id))
@@ -511,7 +487,6 @@ def handle_message(event, vk):
                 del temp_data[from_id]
                 return
 
-        # === ВЫБОР ЗАКАЗА ===
         if msg.startswith("#") or (msg.isdigit() and len(msg) <= 5):
             order_id = int(msg.replace("#", ""))
             if from_id in STAFF_IDS:
@@ -521,7 +496,6 @@ def handle_message(event, vk):
                 send(vk, from_id, "Только сотрудники могут редактировать заказы.", get_main_keyboard(from_id))
             return
 
-        # === БЫСТРЫЕ КНОПКИ ===
         if msg == "🌅 Завтрак":
             temp_data[from_id] = {"step": "class_name", "meal_type": "завтрак"}
             send(vk, from_id, "🏫 Заказ на ЗАВТРАК.\n\nНапиши название класса (например: 9А)", None)
@@ -531,7 +505,6 @@ def handle_message(event, vk):
             send(vk, from_id, "🏫 Заказ на ОБЕД.\n\nНапиши название класса (например: 9А)", None)
             return
 
-        # === ДИАЛОГ ===
         if from_id in temp_data:
             step = temp_data[from_id].get("step")
             
@@ -646,6 +619,20 @@ if __name__ == "__main__":
     longpoll = VkBotLongPoll(vk_session, GROUP_ID)
     print("🤖 SWILL BOT ACTIVE")
     print("Жду сообщений...")
-    for event in longpoll.listen():
-        if event.type == VkBotEventType.MESSAGE_NEW:
-            handle_message(event, vk)
+    
+    # === ВЕЧНЫЙ ЦИКЛ С ПЕРЕПОДКЛЮЧЕНИЕМ ===
+    while True:
+        try:
+            for event in longpoll.listen():
+                if event.type == VkBotEventType.MESSAGE_NEW:
+                    handle_message(event, vk)
+        except Exception as e:
+            print(f"⚠️ Ошибка longpoll: {e}")
+            print("Переподключение через 10 секунд...")
+            time.sleep(10)
+            try:
+                longpoll = VkBotLongPoll(vk_session, GROUP_ID)
+                print("✅ Переподключено")
+            except Exception as e2:
+                print(f"❌ Не удалось переподключиться: {e2}")
+                time.sleep(30)
