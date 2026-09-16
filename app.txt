@@ -4,14 +4,13 @@ import time
 import subprocess
 
 def run_bot():
-    """Запускает бота и следит за ним — если упадёт, перезапустит"""
     while True:
         try:
             print("🚀 Запуск бота...")
             subprocess.run(["python", "bot.py"])
         except Exception as e:
             print(f"❌ Бот упал: {e}")
-        print("⚠️ Бот завершился. Перезапуск через 5 секунд...")
+        print("⚠️ Перезапуск через 5 секунд...")
         time.sleep(5)
 
 if __name__ == "__main__":
