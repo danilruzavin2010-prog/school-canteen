@@ -41,6 +41,11 @@ def get_db_connection():
     )
     return conn, "postgresql"
 
+# === HEALTHCHECK ДЛЯ AMVERA ===
+@app.route('/health')
+def health():
+    return "OK", 200
+
 HTML = """
 <!DOCTYPE html>
 <html>

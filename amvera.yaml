@@ -6,5 +6,6 @@ meta:
 build:
   requirementsPath: requirements.txt
 run:
-  command: gunicorn --bind 0.0.0.0:80 web_panel:app
+  command: python web_panel.py
   containerPort: 80
+  persistenceMount: /data
