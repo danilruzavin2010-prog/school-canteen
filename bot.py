@@ -10,7 +10,12 @@ import time
 # === КОНФИГ ===
 VK_TOKEN = os.environ.get("VK_TOKEN", "vk1.a.z1AGhRJTlOfwdx4ldltGvv10FPkpmfgUHproUb6uREpo0Ao2TH8PCldeXPDFY7O7qVVkd2NdhCtOd1EJ321WsxAXw_BfL8U13lkhK3JC77rUvMuHAhqiaGB4VPMFnMvb9qhEjWXyXwzf4RtQIshOIxxFbKUJUjaEQgX9aouqhvaHYM0zvVLzTDE_9qEmIlFVIE7x7oGrqNuTYDWXGj2T4A")
 GROUP_ID = 241386335
+
+# Сотрудники — могут редактировать заказы (добавлять/убирать людей)
 STAFF_IDS = [523723395]
+
+# Создатель — ТОЛЬКО ОН может удалять заказы
+CREATOR_ID = 523723395
 
 def get_db_connection():
     db_url = os.environ.get("DATABASE_URL")
@@ -146,6 +151,23 @@ def create_order(user_id, class_name, order_date, meal_type, cp, cb, cs, co, cpz
     conn.commit()
     conn.close()
 
+def delete_order(order_id):
+    """Удаляет заказ. Только для CREATOR."""
+    conn, db_type = get_db_connection()
+    cur = conn.cursor()
+    try:
+        if db_type == "sqlite":
+            cur.execute("DELETE FROM orders WHERE id = ?", (order_id,))
+        else:
+            cur.execute("DELETE FROM orders WHERE id = %s", (order_id,))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Ошибка удаления: {e}")
+        return False
+    finally:
+        conn.close()
+
 def get_user_orders_today(user_id):
     today = datetime.date.today().isoformat()
     conn, db_type = get_db_connection()
@@ -221,6 +243,18 @@ def parse_date(text):
                 return None
     return None
 
+def clean_names(text):
+    """Убирает пустые значения, '-' и '0' из списка фамилий"""
+    if not text:
+        return []
+    parts = [n.strip() for n in text.split(',')]
+    result = []
+    for p in parts:
+        if p and p not in ['-', '—', '–', '0', 'нет', 'Нет']:
+            result.append(p)
+    return result
+
+# === КЛАВИАТУРЫ ===
 def get_main_keyboard(from_id):
     keyboard = VkKeyboard(one_time=False)
     keyboard.add_button("🌅 Завтрак", color=VkKeyboardColor.SECONDARY)
@@ -239,6 +273,7 @@ def get_date_keyboard():
     keyboard.add_button("Завтра", color=VkKeyboardColor.PRIMARY)
     keyboard.add_line()
     keyboard.add_button("Послезавтра", color=VkKeyboardColor.SECONDARY)
+    keyboard.add_button("🔙 Назад", color=VkKeyboardColor.NEGATIVE)
     return keyboard.get_keyboard()
 
 def get_category_keyboard():
@@ -251,6 +286,8 @@ def get_category_keyboard():
     keyboard.add_line()
     keyboard.add_button("🚌 Подвоз", color=VkKeyboardColor.SECONDARY)
     keyboard.add_button("✅ Готово", color=VkKeyboardColor.POSITIVE)
+    keyboard.add_line()
+    keyboard.add_button("🔙 Назад", color=VkKeyboardColor.NEGATIVE)
     return keyboard.get_keyboard()
 
 def get_edit_category_keyboard():
@@ -265,11 +302,13 @@ def get_edit_category_keyboard():
     keyboard.add_button("🔙 Назад", color=VkKeyboardColor.NEGATIVE)
     return keyboard.get_keyboard()
 
-def get_names_action_keyboard():
+def get_names_action_keyboard(from_id=None):
     keyboard = VkKeyboard(one_time=True)
     keyboard.add_button("➕ Добавить", color=VkKeyboardColor.POSITIVE)
     keyboard.add_button("➖ Удалить", color=VkKeyboardColor.NEGATIVE)
     keyboard.add_line()
+    if from_id is not None and from_id == CREATOR_ID:
+        keyboard.add_button("🗑 Удалить заказ", color=VkKeyboardColor.NEGATIVE)
     keyboard.add_button("🔙 Другая категория", color=VkKeyboardColor.SECONDARY)
     return keyboard.get_keyboard()
 
@@ -326,6 +365,7 @@ def handle_message(event, vk):
 
         user_id = user_data[0]
 
+        # === ОТЧЁТ ===
         if msg_lower.startswith("отчёт") or msg_lower.startswith("!стафф") or msg == "📋 Отчёт":
             if from_id not in STAFF_IDS:
                 send(vk, from_id, "Доступ запрещён.", get_main_keyboard(from_id))
@@ -386,10 +426,12 @@ def handle_message(event, vk):
             send(vk, from_id, reply, get_main_keyboard(from_id))
             return
 
+        # === МОИ ЗАКАЗЫ ===
         if msg == "✏️ Мои заказы" or msg_lower.startswith("мои заказы"):
             show_my_orders(vk, from_id, user_id)
             return
 
+        # === РЕДАКТИРОВАНИЕ ===
         if msg == "🛠 Редактировать":
             if from_id not in STAFF_IDS:
                 send(vk, from_id, "Доступ запрещён.", get_main_keyboard(from_id))
@@ -420,7 +462,7 @@ def handle_message(event, vk):
                     current_names = names_row[idx] or "—"
                     send(vk, from_id,
                          f"Категория: {msg}\n\nТекущие фамилии:\n{current_names}\n\nЧто сделать?",
-                         get_names_action_keyboard())
+                         get_names_action_keyboard(from_id))
                     return
                 send(vk, from_id, "Выбери категорию кнопкой:", get_edit_category_keyboard())
                 return
@@ -438,7 +480,17 @@ def handle_message(event, vk):
                     temp_data[from_id]["step"] = "staff_edit_remove_names"
                     send(vk, from_id, "Напиши ФАМИЛИИ через запятую, которые надо УДАЛИТЬ:", None)
                     return
-                send(vk, from_id, "Выбери действие кнопкой:", get_names_action_keyboard())
+                if msg == "🗑 Удалить заказ":
+                    if from_id != CREATOR_ID:
+                        send(vk, from_id, "❌ Только создатель может удалять заказы.", get_main_keyboard(from_id))
+                        return
+                    if delete_order(order_id):
+                        del temp_data[from_id]
+                        send(vk, from_id, "✅ Заказ удалён.", get_main_keyboard(from_id))
+                    else:
+                        send(vk, from_id, "❌ Ошибка удаления.", get_main_keyboard(from_id))
+                    return
+                send(vk, from_id, "Выбери действие кнопкой:", get_names_action_keyboard(from_id))
                 return
 
             if step == "staff_edit_add_names":
@@ -446,8 +498,8 @@ def handle_message(event, vk):
                 names_row = get_order_names(order_id)
                 idx = {"plat": 0, "bes": 1, "svo": 2, "ovz": 3, "podvoz": 4}[cat]
                 current = names_row[idx] or ""
-                current_list = [n.strip() for n in current.split(',') if n.strip()]
-                new_names = [n.strip() for n in msg.split(',') if n.strip()]
+                current_list = clean_names(current)
+                new_names = clean_names(msg)
                 for n in new_names:
                     if n not in current_list:
                         current_list.append(n)
@@ -467,8 +519,8 @@ def handle_message(event, vk):
                 names_row = get_order_names(order_id)
                 idx = {"plat": 0, "bes": 1, "svo": 2, "ovz": 3, "podvoz": 4}[cat]
                 current = names_row[idx] or ""
-                current_list = [n.strip() for n in current.split(',') if n.strip()]
-                to_remove = [n.strip() for n in msg.split(',') if n.strip()]
+                current_list = clean_names(current)
+                to_remove = clean_names(msg)
                 removed = []
                 for n in to_remove:
                     if n in current_list:
@@ -485,6 +537,7 @@ def handle_message(event, vk):
                 del temp_data[from_id]
                 return
 
+        # === ВЫБОР ЗАКАЗА ===
         if msg.startswith("#"):
             if from_id not in STAFF_IDS:
                 send(vk, from_id, "Только сотрудники могут редактировать заказы.", get_main_keyboard(from_id))
@@ -494,19 +547,41 @@ def handle_message(event, vk):
             send(vk, from_id, f"📝 Редактируешь заказ #{order_id}\n\nВыбери категорию:", get_edit_category_keyboard())
             return
 
+        # === БЫСТРЫЕ КНОПКИ ===
         if msg == "🌅 Завтрак":
-            temp_data[from_id] = {"step": "class_name", "meal_type": "завтрак"}
+            temp_data[from_id] = {"step": "class_name", "meal_type": "завтрак", "history": []}
             send(vk, from_id, "🏫 Заказ на ЗАВТРАК.\n\nНапиши название класса (например: 9А)", None)
             return
         if msg == "🌞 Обед":
-            temp_data[from_id] = {"step": "class_name", "meal_type": "обед"}
+            temp_data[from_id] = {"step": "class_name", "meal_type": "обед", "history": []}
             send(vk, from_id, "🏫 Заказ на ОБЕД.\n\nНапиши название класса (например: 9А)", None)
             return
 
+        # === ДИАЛОГ ===
         if from_id in temp_data:
             step = temp_data[from_id].get("step")
             
+            # === ОБРАБОТКА "НАЗАД" ===
+            if msg == "🔙 Назад":
+                history = temp_data[from_id].get("history", [])
+                if not history:
+                    del temp_data[from_id]
+                    send(vk, from_id, "Главное меню:", get_main_keyboard(from_id))
+                    return
+                prev_step = history.pop()
+                temp_data[from_id]["step"] = prev_step
+                temp_data[from_id]["history"] = history
+                
+                if prev_step == "class_name":
+                    send(vk, from_id, "🏫 Напиши название класса (например: 9А)", None)
+                elif prev_step == "date":
+                    send(vk, from_id, "📅 Выбери дату:", get_date_keyboard())
+                elif prev_step == "category":
+                    send(vk, from_id, "👥 Выбери категорию:", get_category_keyboard())
+                return
+            
             if step == "class_name":
+                temp_data[from_id]["history"].append("class_name")
                 temp_data[from_id]["class_name"] = msg.upper()
                 temp_data[from_id]["step"] = "date"
                 send(vk, from_id, "📅 Шаг 2. Выбери дату:", get_date_keyboard())
@@ -517,6 +592,7 @@ def handle_message(event, vk):
                 if not date_str:
                     send(vk, from_id, "Не понял дату. Выбери кнопку или напиши ГГГГ-ММ-ДД:", get_date_keyboard())
                     return
+                temp_data[from_id]["history"].append("date")
                 temp_data[from_id]["date"] = date_str
                 temp_data[from_id]["step"] = "category"
                 temp_data[from_id]["names_plat"] = []
@@ -526,7 +602,7 @@ def handle_message(event, vk):
                 temp_data[from_id]["names_podvoz"] = []
                 send(vk, from_id,
                      "👥 Шаг 3. Выбери категорию, а потом напиши ФАМИЛИИ через запятую.\n\n"
-                     "Пример: Иванов, Петров, Сидоров\n\n"
+                     "Если человек не нужен — напиши `-` или `0`, они не будут учитываться.\n\n"
                      "Когда закончишь — нажми ✅ Готово",
                      get_category_keyboard())
                 return
@@ -570,66 +646,24 @@ def handle_message(event, vk):
                 
                 if msg == "💳 Платники":
                     temp_data[from_id]["current_category"] = "plat"
-                    send(vk, from_id, "Напиши ФАМИЛИИ платников через запятую:", None)
+                    send(vk, from_id, "Напиши ФАМИЛИИ платников через запятую:\n\nЕсли человек не нужен — напиши `-` или `0`", None)
                     return
                 if msg == "🆓 Бесплатники":
                     temp_data[from_id]["current_category"] = "bes"
-                    send(vk, from_id, "Напиши ФАМИЛИИ бесплатников через запятую:", None)
+                    send(vk, from_id, "Напиши ФАМИЛИИ бесплатников через запятую:\n\nЕсли человек не нужен — напиши `-` или `0`", None)
                     return
                 if msg == "⭐ СВО":
                     temp_data[from_id]["current_category"] = "svo"
-                    send(vk, from_id, "Напиши ФАМИЛИИ СВО через запятую:", None)
+                    send(vk, from_id, "Напиши ФАМИЛИИ СВО через запятую:\n\nЕсли человек не нужен — напиши `-` или `0`", None)
                     return
                 if msg == "♿ ОВЗ":
                     temp_data[from_id]["current_category"] = "ovz"
-                    send(vk, from_id, "Напиши ФАМИЛИИ ОВЗ через запятую:", None)
+                    send(vk, from_id, "Напиши ФАМИЛИИ ОВЗ через запятую:\n\nЕсли человек не нужен — напиши `-` или `0`", None)
                     return
                 if msg == "🚌 Подвоз":
                     temp_data[from_id]["current_category"] = "podvoz"
-                    send(vk, from_id, "Напиши ФАМИЛИИ подвоза через запятую:", None)
+                    send(vk, from_id, "Напиши ФАМИЛИИ подвоза через запятую:\n\nЕсли человек не нужен — напиши `-` или `0`", None)
                     return
                 
                 if "current_category" in temp_data[from_id]:
-                    cat = temp_data[from_id]["current_category"]
-                    names = [n.strip() for n in msg.split(',') if n.strip()]
-                    temp_data[from_id][f"names_{cat}"].extend(names)
-                    total_in_cat = len(temp_data[from_id][f"names_{cat}"])
-                    cat_names = {"plat": "Платники", "bes": "Бесплатники", "svo": "СВО", "ovz": "ОВЗ", "podvoz": "Подвоз"}
-                    send(vk, from_id, f"✅ Добавлено {len(names)} чел. в {cat_names[cat]}.\nВсего: {total_in_cat}\n\nВыбери следующую категорию или нажми ✅ Готово:", get_category_keyboard())
-                    return
-                
-                send(vk, from_id, "Выбери категорию кнопкой ниже:", get_category_keyboard())
-                return
-
-        send(vk, from_id, "📌 Выбери действие на клавиатуре 👇", get_main_keyboard(from_id))
-
-    except Exception as e:
-        print(f"❌ ОШИБКА: {e}")
-        try:
-            send(vk, from_id, "Произошла ошибка. Попробуй ещё раз.", get_main_keyboard(from_id))
-        except:
-            pass
-
-if __name__ == "__main__":
-    init_db()
-    vk_session = vk_api.VkApi(token=VK_TOKEN)
-    vk = vk_session.get_api()
-    longpoll = VkBotLongPoll(vk_session, GROUP_ID)
-    print("🤖 SWILL BOT ACTIVE")
-    print("Жду сообщений...")
-    
-    while True:
-        try:
-            for event in longpoll.listen():
-                if event.type == VkBotEventType.MESSAGE_NEW:
-                    handle_message(event, vk)
-        except Exception as e:
-            print(f"⚠️ Ошибка longpoll: {e}")
-            print("Переподключение через 10 секунд...")
-            time.sleep(10)
-            try:
-                longpoll = VkBotLongPoll(vk_session, GROUP_ID)
-                print("✅ Переподключено")
-            except Exception as e2:
-                print(f"❌ Не удалось переподключиться: {e2}")
-                time.sleep(30)
+                    cat = temp_data[from_id
