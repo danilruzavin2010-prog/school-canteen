@@ -227,7 +227,7 @@ def show_my_orders(vk, uid, user_id):
         rep += f"#{oid} 🏫 {cn} ({mt}): {cp+cb+cs+co+cpz} чел.\n"
         rep += f"  Платники: {cp} | Бесплатники: {cb} | СВО: {cs} | ОВЗ: {co} | Подвоз: {cpz}\n\n"
     send(vk, uid, rep, get_main_keyboard(uid))
-    def get_all_orders_by_date(date_str):
+def get_all_orders_by_date(date_str):
     conn, db_type = get_db_connection(); cur = conn.cursor()
     if db_type == "sqlite":
         cur.execute("SELECT id, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE order_date = ? ORDER BY class_name", (date_str,))
