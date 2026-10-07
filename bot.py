@@ -315,7 +315,7 @@ def handle_message(event, vk):
                 send(vk, uid, "Доступ запрещён.", get_main_keyboard(uid)); return
             temp_data[uid] = {"step": "edit_date"}
             send(vk, uid, "📅 На какую дату смотреть заказы?", get_edit_date_keyboard()); return
-                if uid in temp_data and temp_data[uid].get("step") == "edit_date":
+        if uid in temp_data and temp_data[uid].get("step") == "edit_date":
             if msg == "📅 Сегодня":
                 date_str = datetime.date.today().isoformat()
                 label = "СЕГОДНЯ"
