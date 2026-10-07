@@ -152,8 +152,8 @@ def clean_names(text):
     if not text: return []
     parts = [n.strip() for n in text.split(',')]
     return [p for p in parts if p and p not in ['-', '—', '–', '0', 'нет', 'Нет']]
-    
-    def get_main_keyboard(from_id):
+
+def get_main_keyboard(from_id):
     k = VkKeyboard(one_time=False)
     k.add_button("🌅 Завтрак", color=VkKeyboardColor.SECONDARY)
     k.add_button("🌞 Обед", color=VkKeyboardColor.SECONDARY)
@@ -164,7 +164,7 @@ def clean_names(text):
         k.add_line()
         k.add_button("🛠 Редактировать", color=VkKeyboardColor.PRIMARY)
     return k.get_keyboard()
-
+    
 def get_date_keyboard():
     k = VkKeyboard(one_time=True)
     k.add_button("Сегодня", color=VkKeyboardColor.PRIMARY)
