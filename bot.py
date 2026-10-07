@@ -192,6 +192,13 @@ def get_edit_category_keyboard():
     k.add_button("Подвоз", color=VkKeyboardColor.SECONDARY)
     k.add_button("🔙 Назад", color=VkKeyboardColor.NEGATIVE)
     return k.get_keyboard()
+    def get_edit_date_keyboard():
+    k = VkKeyboard(one_time=True)
+    k.add_button("📅 Сегодня", color=VkKeyboardColor.PRIMARY)
+    k.add_button("📅 Завтра", color=VkKeyboardColor.PRIMARY)
+    k.add_line()
+    k.add_button("🔙 Назад", color=VkKeyboardColor.NEGATIVE)
+    return k.get_keyboard()
 
 def get_names_action_keyboard(from_id=None):
     k = VkKeyboard(one_time=True)
@@ -220,6 +227,13 @@ def show_my_orders(vk, uid, user_id):
         rep += f"#{oid} 🏫 {cn} ({mt}): {cp+cb+cs+co+cpz} чел.\n"
         rep += f"  Платники: {cp} | Бесплатники: {cb} | СВО: {cs} | ОВЗ: {co} | Подвоз: {cpz}\n\n"
     send(vk, uid, rep, get_main_keyboard(uid))
+    def get_all_orders_by_date(date_str):
+    conn, db_type = get_db_connection(); cur = conn.cursor()
+    if db_type == "sqlite":
+        cur.execute("SELECT id, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE order_date = ? ORDER BY class_name", (date_str,))
+    else:
+        cur.execute("SELECT id, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE order_date = %s ORDER BY class_name", (date_str,))
+    rows = cur.fetchall(); conn.close(); return rows
 
 def show_all_orders(vk, uid):
     rows = get_all_orders_today()
@@ -296,10 +310,35 @@ def handle_message(event, vk):
         if msg == "✏️ Мои заказы" or low.startswith("мои заказы"):
             show_my_orders(vk, uid, user_id); return
 
-        if msg == "🛠 Редактировать":
+               if msg == "🛠 Редактировать":
             if uid not in STAFF_IDS and uid not in CREATOR_IDS:
                 send(vk, uid, "Доступ запрещён.", get_main_keyboard(uid)); return
-            show_all_orders(vk, uid); return
+            temp_data[uid] = {"step": "edit_date"}
+            send(vk, uid, "📅 На какую дату смотреть заказы?", get_edit_date_keyboard()); return
+        if uid in temp_data and temp_data[uid].get("step") == "edit_date":
+            if msg == "📅 Сегодня":
+                date_str = datetime.date.today().isoformat()
+                label = "СЕГОДНЯ"
+            elif msg == "📅 Завтра":
+                date_str = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
+                label = "ЗАВТРА"
+            elif msg == "🔙 Назад":
+                del temp_data[uid]
+                send(vk, uid, "Меню:", get_main_keyboard(uid)); return
+            else:
+                send(vk, uid, "Выбери дату кнопкой:", get_edit_date_keyboard()); return
+            
+            del temp_data[uid]
+            rows = get_all_orders_by_date(date_str)
+            if not rows:
+                send(vk, uid, f"Заказов на {label} нет.", get_main_keyboard(uid)); return
+            rep = f"📋 ВСЕ ЗАКАЗЫ НА {label}:\n\n"
+            for r in rows:
+                oid, cn, mt, cp, cb, cs, co, cpz = r
+                rep += f"#{oid} 🏫 {cn} ({mt}): {cp+cb+cs+co+cpz} чел.\n"
+                rep += f"  Платники: {cp} | Бесплатники: {cb} | СВО: {cs} | ОВЗ: {co} | Подвоз: {cpz}\n\n"
+            rep += "Напиши #ID заказа для редактирования."
+            send(vk, uid, rep, get_main_keyboard(uid)); return
 
         if uid in temp_data and temp_data[uid].get("step", "").startswith("se"):
             if uid not in STAFF_IDS and uid not in CREATOR_IDS:
