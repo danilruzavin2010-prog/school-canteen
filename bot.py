@@ -198,7 +198,7 @@ def get_names_action_keyboard(from_id=None):
     k.add_button("➕ Добавить", color=VkKeyboardColor.POSITIVE)
     k.add_button("➖ Удалить", color=VkKeyboardColor.NEGATIVE)
     k.add_line()
-    if from_id is not None and from_id == CREATOR_ID:
+    if from_id is not None and from_id in CREATOR_IDS:
         k.add_button("🗑 Удалить заказ", color=VkKeyboardColor.NEGATIVE)
     k.add_button("🔙 Другая категория", color=VkKeyboardColor.SECONDARY)
     return k.get_keyboard()
@@ -324,7 +324,7 @@ def handle_message(event, vk):
                 if msg == "➖ Удалить":
                     temp_data[uid]["step"] = "se_rem"; send(vk, uid, "Напиши ФАМИЛИИ через запятую для УДАЛЕНИЯ:", None); return
                 if msg == "🗑 Удалить заказ":
-                    if uid != CREATOR_ID:
+                    if uid not in CREATOR_IDS:
                         send(vk, uid, "❌ Только создатель может удалять.", get_main_keyboard(uid)); return
                     if delete_order(oid):
                         del temp_data[uid]; send(vk, uid, "✅ Заказ удалён.", get_main_keyboard(uid))
