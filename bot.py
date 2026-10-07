@@ -338,7 +338,6 @@ def handle_message(event, vk):
                 rep += f"  Платники: {cp} | Бесплатники: {cb} | СВО: {cs} | ОВЗ: {co} | Подвоз: {cpz}\n\n"
             rep += "Напиши #ID заказа для редактирования."
             send(vk, uid, rep, get_main_keyboard(uid)); return
-     
         if uid in temp_data and temp_data[uid].get("step", "").startswith("se"):
             if uid not in STAFF_IDS and uid not in CREATOR_IDS:
                 send(vk, uid, "Доступ запрещён.", get_main_keyboard(uid)); del temp_data[uid]; return
