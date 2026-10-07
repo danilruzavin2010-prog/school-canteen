@@ -192,7 +192,7 @@ def get_edit_category_keyboard():
     k.add_button("Подвоз", color=VkKeyboardColor.SECONDARY)
     k.add_button("🔙 Назад", color=VkKeyboardColor.NEGATIVE)
     return k.get_keyboard()
-        def get_edit_date_keyboard():
+    def get_edit_date_keyboard():
         k = VkKeyboard(one_time=True)
         k.add_button("📅 Сегодня", color=VkKeyboardColor.PRIMARY)
         k.add_button("📅 Завтра", color=VkKeyboardColor.PRIMARY)
