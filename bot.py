@@ -152,7 +152,7 @@ def get_main_keyboard(from_id):
     k.add_button("🌞 Обед", color=VkKeyboardColor.SECONDARY)
     k.add_line()
     k.add_button("✏️ Мои заказы", color=VkKeyboardColor.SECONDARY)
-    if from_id in STAFF_IDS:
+    if from_id in STAFF_IDS or from_id in CREATOR_IDS:
         k.add_button("📋 Отчёт", color=VkKeyboardColor.POSITIVE)
         k.add_line()
         k.add_button("🛠 Редактировать", color=VkKeyboardColor.PRIMARY)
@@ -248,7 +248,7 @@ def handle_message(event, vk):
         user_id = ud[0]
 
         if low.startswith("отчёт") or low.startswith("!стафф") or msg == "📋 Отчёт":
-            if uid not in STAFF_IDS:
+            if uid not in STAFF_IDS and uid not in CREATOR_IDS:
                 send(vk, uid, "Доступ запрещён.", get_main_keyboard(uid)); return
             conn, db_type = get_db_connection(); cur = conn.cursor()
             if db_type == "sqlite": cur.execute("SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE order_date = DATE('now')")
@@ -297,12 +297,12 @@ def handle_message(event, vk):
             show_my_orders(vk, uid, user_id); return
 
         if msg == "🛠 Редактировать":
-            if uid not in STAFF_IDS:
+            if uid not in STAFF_IDS and uid not in CREATOR_IDS:
                 send(vk, uid, "Доступ запрещён.", get_main_keyboard(uid)); return
             show_all_orders(vk, uid); return
 
         if uid in temp_data and temp_data[uid].get("step", "").startswith("se"):
-            if uid not in STAFF_IDS:
+            if uid not in STAFF_IDS and uid not in CREATOR_IDS:
                 send(vk, uid, "Доступ запрещён.", get_main_keyboard(uid)); del temp_data[uid]; return
             step = temp_data[uid]["step"]; oid = temp_data[uid]["oid"]
             if step == "se_cat":
@@ -357,7 +357,7 @@ def handle_message(event, vk):
                 del temp_data[uid]; return
 
         if msg.startswith("#"):
-            if uid not in STAFF_IDS:
+            if uid not in STAFF_IDS and uid not in CREATOR_IDS:
                 send(vk, uid, "Только сотрудники.", get_main_keyboard(uid)); return
             oid = int(msg.replace("#", ""))
             temp_data[uid] = {"step": "se_cat", "oid": oid}
