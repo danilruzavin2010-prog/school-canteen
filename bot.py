@@ -10,11 +10,7 @@ import time
 # === КОНФИГ ===
 VK_TOKEN = os.environ.get("VK_TOKEN", "vk1.a.z1AGhRJTlOfwdx4ldltGvv10FPkpmfgUHproUb6uREpo0Ao2TH8PCldeXPDFY7O7qVVkd2NdhCtOd1EJ321WsxAXw_BfL8U13lkhK3JC77rUvMuHAhqiaGB4VPMFnMvb9qhEjWXyXwzf4RtQIshOIxxFbKUJUjaEQgX9aouqhvaHYM0zvVLzTDE_9qEmIlFVIE7x7oGrqNuTYDWXGj2T4A")
 GROUP_ID = 241386335
-
-# Сотрудники — могут редактировать заказы (добавлять/убирать людей)
 STAFF_IDS = [523723395]
-
-# Создатель — ТОЛЬКО ОН может удалять заказы
 CREATOR_ID = 523723395
 
 def get_db_connection():
@@ -152,7 +148,6 @@ def create_order(user_id, class_name, order_date, meal_type, cp, cb, cs, co, cpz
     conn.close()
 
 def delete_order(order_id):
-    """Удаляет заказ. Только для CREATOR."""
     conn, db_type = get_db_connection()
     cur = conn.cursor()
     try:
@@ -254,7 +249,6 @@ def clean_names(text):
             result.append(p)
     return result
 
-# === КЛАВИАТУРЫ ===
 def get_main_keyboard(from_id):
     keyboard = VkKeyboard(one_time=False)
     keyboard.add_button("🌅 Завтрак", color=VkKeyboardColor.SECONDARY)
@@ -345,9 +339,7 @@ def show_all_orders(vk, from_id):
         reply += f"#{order_id} 🏫 {cn} ({mt}): {total} чел.\n"
         reply += f"  Платники: {cp} | Бесплатники: {cb} | СВО: {cs} | ОВЗ: {co} | Подвоз: {cpz}\n\n"
     reply += "Напиши номер заказа (#ID), чтобы редактировать."
-    send(vk, from_id, reply, get_main_keyboard(from_id))
-
-def handle_message(event, vk):
+    send(vk, from_id, reply, get_main_keyboard(from_id))def handle_message(event, vk):
     try:
         msg = event.obj.message['text'].strip()
         msg_lower = msg.lower()
@@ -561,7 +553,6 @@ def handle_message(event, vk):
         if from_id in temp_data:
             step = temp_data[from_id].get("step")
             
-            # === ОБРАБОТКА "НАЗАД" ===
             if msg == "🔙 Назад":
                 history = temp_data[from_id].get("history", [])
                 if not history:
@@ -666,4 +657,9 @@ def handle_message(event, vk):
                     return
                 
                 if "current_category" in temp_data[from_id]:
-                    cat = temp_data[from_id
+                    cat = temp_data[from_id]["current_category"]
+                    names = clean_names(msg)
+                    if names:
+                        temp_data[from_id][f"names_{cat}"].extend(names)
+                    total_in_cat = len(temp_data[from_id][f"names_{cat}"])
+                    cat_names = {"plat": "П
