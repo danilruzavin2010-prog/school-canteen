@@ -310,7 +310,7 @@ def handle_message(event, vk):
         if msg == "✏️ Мои заказы" or low.startswith("мои заказы"):
             show_my_orders(vk, uid, user_id); return
 
-        if msg == "🛠 Редактировать":
+           if msg == "🛠 Редактировать":
             if uid not in STAFF_IDS and uid not in CREATOR_IDS:
                 send(vk, uid, "Доступ запрещён.", get_main_keyboard(uid)); return
             temp_data[uid] = {"step": "edit_date"}
