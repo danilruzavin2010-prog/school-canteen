@@ -12,6 +12,7 @@ VK_TOKEN = os.environ.get("VK_TOKEN", "vk1.a.z1AGhRJTlOfwdx4ldltGvv10FPkpmfgUHpr
 GROUP_ID = 241386335
 STAFF_IDS = [523723395, 768610229, 165518301, 424711270, 157860178]
 CREATOR_IDS = [523723395, 768610229]
+temp_data = {}
 
 def get_db_connection():
     db_url = os.environ.get("DATABASE_URL")
@@ -184,7 +185,6 @@ def get_names_action_keyboard(from_id=None):
         keyboard.add_button("🗑 Удалить заказ", color=VkKeyboardColor.NEGATIVE)
     keyboard.add_button("🔙 Другая категория", color=VkKeyboardColor.SECONDARY)
     return keyboard.get_keyboard()
-    temp_data = {}
 
 def send(vk, user_id, message, keyboard=None):
     params = {'user_id': user_id, 'message': message, 'random_id': 0}
