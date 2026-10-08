@@ -426,11 +426,11 @@ def handle_message(event, vk):
             send(vk, from_id, f"📝 Редактируешь заказ #{order_id}\n\nВыбери категорию:", get_edit_category_keyboard())
             return
             
-            if msg == "🌅 Завтрак":
+        if msg == "🌅 Завтрак":
             temp_data[from_id] = {"step": "class_name", "meal_type": "завтрак", "history": []}
             send(vk, from_id, "🏫 Заказ на ЗАВТРАК.\n\nНапиши название класса (например: 9А)", None)
             return
-            if msg == "🌞 Обед":
+        if msg == "🌞 Обед":
             temp_data[from_id] = {"step": "class_name", "meal_type": "обед", "history": []}
             send(vk, from_id, "🏫 Заказ на ОБЕД.\n\nНапиши название класса (например: 9А)", None)
             return
