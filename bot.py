@@ -204,6 +204,20 @@ def show_my_orders(vk, from_id, user_id):
         reply += f"#{order_id} 🏫 {class_name} ({meal_type}): {total} чел.\n"
         reply += f"  Платники: {cp} | Бесплатники: {cb} | СВО: {cs} | ОВЗ: {co} | Подвоз: {cpz}\n\n"
     send(vk, from_id, reply, get_main_keyboard(from_id))
+    
+def show_all_orders(vk, from_id):
+    rows = get_all_orders_today()
+    if not rows:
+        send(vk, from_id, "Заказов на сегодня нет.", get_main_keyboard(from_id))
+        return
+    reply = "📋 ВСЕ ЗАКАЗЫ НА СЕГОДНЯ:\n\n"
+    for r in rows:
+        order_id, cn, mt, cp, cb, cs, co, cpz = r
+        total = cp + cb + cs + co + cpz
+        reply += f"#{order_id} 🏫 {cn} ({mt}): {total} чел.\n"
+        reply += f"  Платники: {cp} | Бесплатники: {cb} | СВО: {cs} | ОВЗ: {co} | Подвоз: {cpz}\n\n"
+    reply += "Напиши номер заказа (#ID), чтобы редактировать."
+    send(vk, from_id, reply, get_main_keyboard(from_id))
 
 def show_orders_by_date(vk, from_id, date_str, label):
     rows = get_all_orders_by_date(date_str)
