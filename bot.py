@@ -11,6 +11,7 @@ import time
 VK_TOKEN = os.environ.get("VK_TOKEN", "vk1.a.z1AGhRJTlOfwdx4ldltGvv10FPkpmfgUHproUb6uREpo0Ao2TH8PCldeXPDFY7O7qVVkd2NdhCtOd1EJ321WsxAXw_BfL8U13lkhK3JC77rUvMuHAhqiaGB4VPMFnMvb9qhEjWXyXwzf4RtQIshOIxxFbKUJUjaEQgX9aouqhvaHYM0zvVLzTDE_9qEmIlFVIE7x7oGrqNuTYDWXGj2T4A")
 GROUP_ID = 241386335
 STAFF_IDS = [523723395, 768610229, 165518301, 424711270, 157860178]
+CREATOR_IDS = [523723395, 768610229]
 
 def get_db_connection():
     db_url = os.environ.get("DATABASE_URL")
@@ -18,7 +19,6 @@ def get_db_connection():
         import sqlite3
         db_path = os.environ.get("DB_PATH", "/data/canteen.db")
         return sqlite3.connect(db_path), "sqlite"
-    
     import psycopg2
     result = urllib.parse.urlparse(db_url)
     conn = psycopg2.connect(
@@ -33,121 +33,81 @@ def get_db_connection():
 def init_db():
     conn, db_type = get_db_connection()
     cur = conn.cursor()
-    
     if db_type == "sqlite":
         cur.executescript('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                vk_id INTEGER UNIQUE,
-                full_name TEXT,
-                department TEXT
-            );
-            CREATE TABLE IF NOT EXISTS orders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                class_name TEXT,
-                order_date TEXT,
-                meal_type TEXT,
-                count_plat INTEGER DEFAULT 0,
-                count_bes INTEGER DEFAULT 0,
-                count_svo INTEGER DEFAULT 0,
-                count_ovz INTEGER DEFAULT 0,
-                count_podvoz INTEGER DEFAULT 0,
-                names_plat TEXT DEFAULT '',
-                names_bes TEXT DEFAULT '',
-                names_svo TEXT DEFAULT '',
-                names_ovz TEXT DEFAULT '',
-                names_podvoz TEXT DEFAULT '',
-                status TEXT DEFAULT 'новый'
-            );
+            CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, vk_id INTEGER UNIQUE, full_name TEXT, department TEXT);
+            CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, class_name TEXT, order_date TEXT, meal_type TEXT, count_plat INTEGER DEFAULT 0, count_bes INTEGER DEFAULT 0, count_svo INTEGER DEFAULT 0, count_ovz INTEGER DEFAULT 0, count_podvoz INTEGER DEFAULT 0, names_plat TEXT DEFAULT '', names_bes TEXT DEFAULT '', names_svo TEXT DEFAULT '', names_ovz TEXT DEFAULT '', names_podvoz TEXT DEFAULT '', status TEXT DEFAULT 'новый');
         ''')
     else:
-        cur.execute('''CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, vk_id BIGINT UNIQUE, full_name TEXT, department TEXT)''')
-        cur.execute('''CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, user_id INTEGER, class_name TEXT, order_date DATE, meal_type TEXT, count_plat INTEGER DEFAULT 0, count_bes INTEGER DEFAULT 0, count_svo INTEGER DEFAULT 0, count_ovz INTEGER DEFAULT 0, count_podvoz INTEGER DEFAULT 0, names_plat TEXT DEFAULT '', names_bes TEXT DEFAULT '', names_svo TEXT DEFAULT '', names_ovz TEXT DEFAULT '', names_podvoz TEXT DEFAULT '', status TEXT DEFAULT 'новый')''')
+        cur.execute("CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, vk_id BIGINT UNIQUE, full_name TEXT, department TEXT)")
+        cur.execute("CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, user_id INTEGER, class_name TEXT, order_date DATE, meal_type TEXT, count_plat INTEGER DEFAULT 0, count_bes INTEGER DEFAULT 0, count_svo INTEGER DEFAULT 0, count_ovz INTEGER DEFAULT 0, count_podvoz INTEGER DEFAULT 0, names_plat TEXT DEFAULT '', names_bes TEXT DEFAULT '', names_svo TEXT DEFAULT '', names_ovz TEXT DEFAULT '', names_podvoz TEXT DEFAULT '', status TEXT DEFAULT 'новый')")
         for col, col_type in [("count_podvoz", "INTEGER DEFAULT 0"), ("names_plat", "TEXT DEFAULT ''"), ("names_bes", "TEXT DEFAULT ''"), ("names_svo", "TEXT DEFAULT ''"), ("names_ovz", "TEXT DEFAULT ''"), ("names_podvoz", "TEXT DEFAULT ''")]:
             try: cur.execute(f"ALTER TABLE orders ADD COLUMN IF NOT EXISTS {col} {col_type}")
             except: pass
-    
-    conn.commit()
-    conn.close()
+    conn.commit(); conn.close()
     print("✅ База данных инициализирована")
 
 def add_user(vk_id, name, dept="не указан"):
-    conn, db_type = get_db_connection()
-    cur = conn.cursor()
-    if db_type == "sqlite":
-        cur.execute("INSERT OR IGNORE INTO users (vk_id, full_name, department) VALUES (?, ?, ?)", (vk_id, name, dept))
-    else:
-        cur.execute("INSERT INTO users (vk_id, full_name, department) VALUES (%s, %s, %s) ON CONFLICT (vk_id) DO NOTHING", (vk_id, name, dept))
-    conn.commit()
-    conn.close()
+    conn, db_type = get_db_connection(); cur = conn.cursor()
+    if db_type == "sqlite": cur.execute("INSERT OR IGNORE INTO users (vk_id, full_name, department) VALUES (?, ?, ?)", (vk_id, name, dept))
+    else: cur.execute("INSERT INTO users (vk_id, full_name, department) VALUES (%s, %s, %s) ON CONFLICT (vk_id) DO NOTHING", (vk_id, name, dept))
+    conn.commit(); conn.close()
 
 def get_user(vk_id):
-    conn, db_type = get_db_connection()
-    cur = conn.cursor()
-    if db_type == "sqlite":
-        cur.execute("SELECT id, full_name FROM users WHERE vk_id = ?", (vk_id,))
-    else:
-        cur.execute("SELECT id, full_name FROM users WHERE vk_id = %s", (vk_id,))
-    row = cur.fetchone()
-    conn.close()
-    return row
+    conn, db_type = get_db_connection(); cur = conn.cursor()
+    if db_type == "sqlite": cur.execute("SELECT id, full_name FROM users WHERE vk_id = ?", (vk_id,))
+    else: cur.execute("SELECT id, full_name FROM users WHERE vk_id = %s", (vk_id,))
+    row = cur.fetchone(); conn.close(); return row
 
 def create_order(user_id, class_name, order_date, meal_type, cp, cb, cs, co, cpz, np, nb, ns, no, npz):
-    conn, db_type = get_db_connection()
-    cur = conn.cursor()
+    conn, db_type = get_db_connection(); cur = conn.cursor()
     if db_type == "sqlite":
-        cur.execute('''INSERT INTO orders (user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz, names_plat, names_bes, names_svo, names_ovz, names_podvoz, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'новый')''', (user_id, class_name, order_date, meal_type, cp, cb, cs, co, cpz, np, nb, ns, no, npz))
+        cur.execute("INSERT INTO orders (user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz, names_plat, names_bes, names_svo, names_ovz, names_podvoz, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'новый')", (user_id, class_name, order_date, meal_type, cp, cb, cs, co, cpz, np, nb, ns, no, npz))
     else:
-        cur.execute('''INSERT INTO orders (user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz, names_plat, names_bes, names_svo, names_ovz, names_podvoz, status) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'новый')''', (user_id, class_name, order_date, meal_type, cp, cb, cs, co, cpz, np, nb, ns, no, npz))
-    conn.commit()
-    conn.close()
+        cur.execute("INSERT INTO orders (user_id, class_name, order_date, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz, names_plat, names_bes, names_svo, names_ovz, names_podvoz, status) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'новый')", (user_id, class_name, order_date, meal_type, cp, cb, cs, co, cpz, np, nb, ns, no, npz))
+    conn.commit(); conn.close()
+
+def delete_order(order_id):
+    conn, db_type = get_db_connection(); cur = conn.cursor()
+    try:
+        if db_type == "sqlite": cur.execute("DELETE FROM orders WHERE id = ?", (order_id,))
+        else: cur.execute("DELETE FROM orders WHERE id = %s", (order_id,))
+        conn.commit(); return True
+    except: return False
+    finally: conn.close()
 
 def get_user_orders_today(user_id):
     today = datetime.date.today().isoformat()
-    conn, db_type = get_db_connection()
-    cur = conn.cursor()
-    if db_type == "sqlite":
-        cur.execute('''SELECT id, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE user_id = ? AND order_date = ?''', (user_id, today))
-    else:
-        cur.execute('''SELECT id, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE user_id = %s AND order_date = %s''', (user_id, today))
-    rows = cur.fetchall()
-    conn.close()
-    return rows
+    conn, db_type = get_db_connection(); cur = conn.cursor()
+    if db_type == "sqlite": cur.execute("SELECT id, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE user_id = ? AND order_date = ?", (user_id, today))
+    else: cur.execute("SELECT id, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE user_id = %s AND order_date = %s", (user_id, today))
+    rows = cur.fetchall(); conn.close(); return rows
 
 def get_all_orders_today():
     today = datetime.date.today().isoformat()
-    conn, db_type = get_db_connection()
-    cur = conn.cursor()
-    if db_type == "sqlite":
-        cur.execute('''SELECT id, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE order_date = ? ORDER BY class_name''', (today,))
-    else:
-        cur.execute('''SELECT id, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE order_date = %s ORDER BY class_name''', (today,))
-    rows = cur.fetchall()
-    conn.close()
-    return rows
+    conn, db_type = get_db_connection(); cur = conn.cursor()
+    if db_type == "sqlite": cur.execute("SELECT id, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE order_date = ? ORDER BY class_name", (today,))
+    else: cur.execute("SELECT id, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE order_date = %s ORDER BY class_name", (today,))
+    rows = cur.fetchall(); conn.close(); return rows
+
+def get_all_orders_by_date(date_str):
+    conn, db_type = get_db_connection(); cur = conn.cursor()
+    if db_type == "sqlite": cur.execute("SELECT id, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE order_date = ? ORDER BY class_name", (date_str,))
+    else: cur.execute("SELECT id, class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE order_date = %s ORDER BY class_name", (date_str,))
+    rows = cur.fetchall(); conn.close(); return rows
 
 def get_order_names(order_id):
-    conn, db_type = get_db_connection()
-    cur = conn.cursor()
-    if db_type == "sqlite":
-        cur.execute("SELECT names_plat, names_bes, names_svo, names_ovz, names_podvoz FROM orders WHERE id = ?", (order_id,))
-    else:
-        cur.execute("SELECT names_plat, names_bes, names_svo, names_ovz, names_podvoz FROM orders WHERE id = %s", (order_id,))
-    row = cur.fetchone()
-    conn.close()
-    return row
+    conn, db_type = get_db_connection(); cur = conn.cursor()
+    if db_type == "sqlite": cur.execute("SELECT names_plat, names_bes, names_svo, names_ovz, names_podvoz FROM orders WHERE id = ?", (order_id,))
+    else: cur.execute("SELECT names_plat, names_bes, names_svo, names_ovz, names_podvoz FROM orders WHERE id = %s", (order_id,))
+    row = cur.fetchone(); conn.close(); return row
 
 def update_order_names(order_id, category, names_str, count):
-    conn, db_type = get_db_connection()
-    cur = conn.cursor()
+    conn, db_type = get_db_connection(); cur = conn.cursor()
     try:
-        if db_type == "sqlite":
-            cur.execute(f"UPDATE orders SET names_{category} = ?, count_{category} = ? WHERE id = ?", (names_str, count, order_id))
-        else:
-            cur.execute(f"UPDATE orders SET names_{category} = %s, count_{category} = %s WHERE id = %s", (names_str, count, order_id))
-        conn.commit()
-        return True
+        if db_type == "sqlite": cur.execute(f"UPDATE orders SET names_{category} = ?, count_{category} = ? WHERE id = ?", (names_str, count, order_id))
+        else: cur.execute(f"UPDATE orders SET names_{category} = %s, count_{category} = %s WHERE id = %s", (names_str, count, order_id))
+        conn.commit(); return True
     except: return False
     finally: conn.close()
 
@@ -215,15 +175,16 @@ def get_edit_category_keyboard():
     keyboard.add_button("🔙 Назад", color=VkKeyboardColor.NEGATIVE)
     return keyboard.get_keyboard()
 
-def get_names_action_keyboard():
+def get_names_action_keyboard(from_id=None):
     keyboard = VkKeyboard(one_time=True)
     keyboard.add_button("➕ Добавить", color=VkKeyboardColor.POSITIVE)
     keyboard.add_button("➖ Удалить", color=VkKeyboardColor.NEGATIVE)
     keyboard.add_line()
+    if from_id is not None and from_id in CREATOR_IDS:
+        keyboard.add_button("🗑 Удалить заказ", color=VkKeyboardColor.NEGATIVE)
     keyboard.add_button("🔙 Другая категория", color=VkKeyboardColor.SECONDARY)
     return keyboard.get_keyboard()
-
-temp_data = {}
+    temp_data = {}
 
 def send(vk, user_id, message, keyboard=None):
     params = {'user_id': user_id, 'message': message, 'random_id': 0}
@@ -244,18 +205,18 @@ def show_my_orders(vk, from_id, user_id):
         reply += f"  Платники: {cp} | Бесплатники: {cb} | СВО: {cs} | ОВЗ: {co} | Подвоз: {cpz}\n\n"
     send(vk, from_id, reply, get_main_keyboard(from_id))
 
-def show_all_orders(vk, from_id):
-    rows = get_all_orders_today()
+def show_orders_by_date(vk, from_id, date_str, label):
+    rows = get_all_orders_by_date(date_str)
     if not rows:
-        send(vk, from_id, "Заказов на сегодня нет.", get_main_keyboard(from_id))
+        send(vk, from_id, f"Заказов на {label} нет.", get_main_keyboard(from_id))
         return
-    reply = "📋 ВСЕ ЗАКАЗЫ НА СЕГОДНЯ:\n\n"
+    reply = f"📋 ВСЕ ЗАКАЗЫ НА {label.upper()}:\n\n"
     for r in rows:
         order_id, cn, mt, cp, cb, cs, co, cpz = r
         total = cp + cb + cs + co + cpz
         reply += f"#{order_id} 🏫 {cn} ({mt}): {total} чел.\n"
         reply += f"  Платники: {cp} | Бесплатники: {cb} | СВО: {cs} | ОВЗ: {co} | Подвоз: {cpz}\n\n"
-    reply += "Напиши номер заказа (#ID), чтобы редактировать."
+    reply += f"Напиши #ID заказа для редактирования."
     send(vk, from_id, reply, get_main_keyboard(from_id))
 
 def handle_message(event, vk):
@@ -283,9 +244,9 @@ def handle_message(event, vk):
             conn, db_type = get_db_connection()
             cur = conn.cursor()
             if db_type == "sqlite":
-                cur.execute('''SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE order_date = DATE('now')''')
+                cur.execute("SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE order_date = DATE('now')")
             else:
-                cur.execute('''SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE order_date = CURRENT_DATE''')
+                cur.execute("SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE order_date = CURRENT_DATE")
             rows = cur.fetchall()
             conn.close()
             if not rows:
@@ -340,7 +301,29 @@ def handle_message(event, vk):
             if from_id not in STAFF_IDS:
                 send(vk, from_id, "Доступ запрещён.", get_main_keyboard(from_id))
                 return
-            show_all_orders(vk, from_id)
+            kb = VkKeyboard(one_time=True)
+            kb.add_button("📅 Сегодня", color=VkKeyboardColor.PRIMARY)
+            kb.add_button("📅 Завтра", color=VkKeyboardColor.PRIMARY)
+            kb.add_line()
+            kb.add_button("📅 Послезавтра", color=VkKeyboardColor.SECONDARY)
+            kb.add_button("🔙 Назад", color=VkKeyboardColor.NEGATIVE)
+            send(vk, from_id, "На какую дату редактировать?", kb.get_keyboard())
+            temp_data[from_id] = {"step": "pick_edit_date"}
+            return
+
+        if from_id in temp_data and temp_data[from_id].get("step") == "pick_edit_date":
+            if msg == "🔙 Назад":
+                del temp_data[from_id]
+                send(vk, from_id, "Главное меню:", get_main_keyboard(from_id))
+                return
+            date_map = {"📅 Сегодня": ("сегодня", "сегодня"), "📅 Завтра": ("завтра", "завтра"), "📅 Послезавтра": ("послезавтра", "послезавтра")}
+            if msg in date_map:
+                dt, label = date_map[msg]
+                dt_str = parse_date(dt)
+                del temp_data[from_id]
+                show_orders_by_date(vk, from_id, dt_str, label)
+                return
+            send(vk, from_id, "Выбери дату кнопкой:", kb.get_keyboard() if False else None)
             return
 
         if from_id in temp_data and temp_data[from_id].get("step", "").startswith("staff_edit"):
@@ -364,7 +347,7 @@ def handle_message(event, vk):
                     names_row = get_order_names(order_id)
                     idx = {"plat": 0, "bes": 1, "svo": 2, "ovz": 3, "podvoz": 4}[cat_map[msg]]
                     current_names = names_row[idx] or "—"
-                    send(vk, from_id, f"Категория: {msg}\n\nТекущие фамилии:\n{current_names}\n\nЧто сделать?", get_names_action_keyboard())
+                    send(vk, from_id, f"Категория: {msg}\n\nТекущие фамилии:\n{current_names}\n\nЧто сделать?", get_names_action_keyboard(from_id))
                     return
                 send(vk, from_id, "Выбери категорию кнопкой:", get_edit_category_keyboard())
                 return
@@ -382,7 +365,17 @@ def handle_message(event, vk):
                     temp_data[from_id]["step"] = "staff_edit_remove_names"
                     send(vk, from_id, "Напиши ФАМИЛИИ через запятую, которые надо УДАЛИТЬ:", None)
                     return
-                send(vk, from_id, "Выбери действие кнопкой:", get_names_action_keyboard())
+                if msg == "🗑 Удалить заказ":
+                    if from_id not in CREATOR_IDS:
+                        send(vk, from_id, "❌ Только создатель может удалять заказы.", get_main_keyboard(from_id))
+                        return
+                    if delete_order(order_id):
+                        del temp_data[from_id]
+                        send(vk, from_id, "✅ Заказ удалён.", get_main_keyboard(from_id))
+                    else:
+                        send(vk, from_id, "❌ Ошибка удаления.", get_main_keyboard(from_id))
+                    return
+                send(vk, from_id, "Выбери действие кнопкой:", get_names_action_keyboard(from_id))
                 return
 
             if step == "staff_edit_add_names":
@@ -517,6 +510,13 @@ def handle_message(event, vk):
                     del temp_data[from_id]
                     return
                 
+                if msg == "🔙 Назад":
+                    temp_data[from_id]["step"] = "class_name"
+                    temp_data[from_id]["history"] = []
+                    send(vk, from_id, "🔙 Вернулись к выбору приёма пищи.\n\nВыбери заново:", get_main_keyboard(from_id))
+                    del temp_data[from_id]
+                    return
+                
                 if msg == "💳 Платники":
                     temp_data[from_id]["current_category"] = "plat"
                     send(vk, from_id, "Напиши ФАМИЛИИ платников через запятую:", None)
@@ -534,7 +534,7 @@ def handle_message(event, vk):
                     send(vk, from_id, "Напиши ФАМИЛИИ ОВЗ через запятую:", None)
                     return
                 if msg == "🚌 Подвоз":
-                    temp_data[from_id]["current_category"] = "podvoz"
+                                        temp_data[from_id]["current_category"] = "podvoz"
                     send(vk, from_id, "Напиши ФАМИЛИИ подвоза через запятую:", None)
                     return
                 
@@ -554,8 +554,10 @@ def handle_message(event, vk):
 
     except Exception as e:
         print(f"❌ ОШИБКА: {e}")
-        try: send(vk, from_id, "Произошла ошибка. Попробуй ещё раз.", get_main_keyboard(from_id))
-        except: pass
+        try:
+            send(vk, from_id, "Произошла ошибка. Попробуй ещё раз.", get_main_keyboard(from_id))
+        except:
+            pass
 
 if __name__ == "__main__":
     init_db()
@@ -564,6 +566,7 @@ if __name__ == "__main__":
     longpoll = VkBotLongPoll(vk_session, GROUP_ID)
     print("🤖 SWILL BOT ACTIVE")
     print("Жду сообщений...")
+    
     while True:
         try:
             for event in longpoll.listen():
@@ -576,4 +579,6 @@ if __name__ == "__main__":
             try:
                 longpoll = VkBotLongPoll(vk_session, GROUP_ID)
                 print("✅ Переподключено")
-            except: time.sleep(30)
+            except Exception as e2:
+                print(f"❌ Не удалось переподключиться: {e2}")
+                time.sleep(30)
