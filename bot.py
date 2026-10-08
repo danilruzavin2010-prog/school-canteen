@@ -301,29 +301,7 @@ def handle_message(event, vk):
             if from_id not in STAFF_IDS:
                 send(vk, from_id, "Доступ запрещён.", get_main_keyboard(from_id))
                 return
-            kb = VkKeyboard(one_time=True)
-            kb.add_button("📅 Сегодня", color=VkKeyboardColor.PRIMARY)
-            kb.add_button("📅 Завтра", color=VkKeyboardColor.PRIMARY)
-            kb.add_line()
-            kb.add_button("📅 Послезавтра", color=VkKeyboardColor.SECONDARY)
-            kb.add_button("🔙 Назад", color=VkKeyboardColor.NEGATIVE)
-            send(vk, from_id, "На какую дату редактировать?", kb.get_keyboard())
-            temp_data[from_id] = {"step": "pick_edit_date"}
-            return
-
-        if from_id in temp_data and temp_data[from_id].get("step") == "pick_edit_date":
-            if msg == "🔙 Назад":
-                del temp_data[from_id]
-                send(vk, from_id, "Главное меню:", get_main_keyboard(from_id))
-                return
-            date_map = {"📅 Сегодня": ("сегодня", "сегодня"), "📅 Завтра": ("завтра", "завтра"), "📅 Послезавтра": ("послезавтра", "послезавтра")}
-            if msg in date_map:
-                dt, label = date_map[msg]
-                dt_str = parse_date(dt)
-                del temp_data[from_id]
-                show_orders_by_date(vk, from_id, dt_str, label)
-                return
-            send(vk, from_id, "Выбери дату кнопкой:", kb.get_keyboard() if False else None)
+            show_all_orders(vk, from_id)
             return
 
         if from_id in temp_data and temp_data[from_id].get("step", "").startswith("staff_edit"):
