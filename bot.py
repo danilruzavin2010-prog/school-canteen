@@ -533,10 +533,10 @@ def handle_message(event, vk):
                     temp_data[from_id]["current_category"] = "ovz"
                     send(vk, from_id, "Напиши ФАМИЛИИ ОВЗ через запятую:", None)
                     return
-                if msg == "🚌 Подвоз":
-                    temp_data[from_id]["current_category"] = "podvoz"
-                    send(vk, from_id, "Напиши ФАМИЛИИ подвоза через запятую:", None)
-                    return
+        if msg == "🚌 Подвоз":
+            temp_data[from_id]["current_category"] = "podvoz"
+            send(vk, from_id, "Напиши ФАМИЛИИ подвоза через запятую:", None)
+            return
                 
                 if "current_category" in temp_data[from_id]:
                     cat = temp_data[from_id]["current_category"]
