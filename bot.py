@@ -220,6 +220,7 @@ def show_orders_by_date(vk, from_id, date_str, label):
     send(vk, from_id, reply, get_main_keyboard(from_id))
 
 def handle_message(event, vk):
+        global temp_data
     try:
         msg = event.obj.message['text'].strip()
         msg_lower = msg.lower()
