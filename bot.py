@@ -221,7 +221,7 @@ def show_orders_by_date(vk, from_id, date_str, label):
 
 def handle_message(event, vk):
         global temp_data
-    try:
+        try:
         msg = event.obj.message['text'].strip()
         msg_lower = msg.lower()
         from_id = event.obj.message['from_id']
