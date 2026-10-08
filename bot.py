@@ -531,9 +531,9 @@ def handle_message(event, vk):
         send(vk, from_id, "📌 Выбери действие на клавиатуре 👇", get_main_keyboard(from_id))
 
     except Exception as e:
-        print(f"❌ ОШИБКА: {e}")
+        print(f"❌ ОШИБКА: {type(e).__name__}: {e}")
         try:
-            send(vk, from_id, "Произошла ошибка. Попробуй ещё раз.", get_main_keyboard(from_id))
+            send(vk, from_id, f"⚠️ Ошибка: {type(e).__name__}: {e}", get_main_keyboard(from_id))
         except:
             pass
 
