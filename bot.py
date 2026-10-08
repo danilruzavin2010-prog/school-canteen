@@ -547,8 +547,8 @@ def handle_message(event, vk):
                     send(vk, from_id, f"✅ Добавлено {len(names)} чел. в {cat_names[cat]}.\nВсего: {total_in_cat}\n\nВыбери следующую категорию или нажми ✅ Готово:", get_category_keyboard())
                     return
                 
-                send(vk, from_id, "Выбери категорию кнопкой ниже:", get_category_keyboard())
-                return
+        send(vk, from_id, "Выбери категорию кнопкой ниже:", get_category_keyboard())
+        return
 
         send(vk, from_id, "📌 Выбери действие на клавиатуре 👇", get_main_keyboard(from_id))
 
