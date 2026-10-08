@@ -538,7 +538,7 @@ def handle_message(event, vk):
             send(vk, from_id, "Напиши ФАМИЛИИ подвоза через запятую:", None)
             return
                 
-                if "current_category" in temp_data[from_id]:
+        if "current_category" in temp_data[from_id]:
                     cat = temp_data[from_id]["current_category"]
                     names = clean_names(msg)
                     temp_data[from_id][f"names_{cat}"].extend(names)
