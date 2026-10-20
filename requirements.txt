@@ -2,5 +2,5 @@ flask
 gunicorn
 vk_api
 psycopg2-binary
-schedule
+openpyxl
 requests
