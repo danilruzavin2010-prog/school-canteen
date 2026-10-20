@@ -39,13 +39,27 @@ def init_db():
             CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, vk_id INTEGER UNIQUE, full_name TEXT, department TEXT);
             CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, class_name TEXT, order_date TEXT, meal_type TEXT, count_plat INTEGER DEFAULT 0, count_bes INTEGER DEFAULT 0, count_svo INTEGER DEFAULT 0, count_ovz INTEGER DEFAULT 0, count_podvoz INTEGER DEFAULT 0, names_plat TEXT DEFAULT '', names_bes TEXT DEFAULT '', names_svo TEXT DEFAULT '', names_ovz TEXT DEFAULT '', names_podvoz TEXT DEFAULT '', status TEXT DEFAULT 'новый');
         ''')
+        for col, col_type in [
+            ("count_podvoz", "INTEGER DEFAULT 0"),
+            ("names_plat", "TEXT DEFAULT ''"),
+            ("names_bes", "TEXT DEFAULT ''"),
+            ("names_svo", "TEXT DEFAULT ''"),
+            ("names_ovz", "TEXT DEFAULT ''"),
+            ("names_podvoz", "TEXT DEFAULT ''")
+        ]:
+            try:
+                cur.execute(f"ALTER TABLE orders ADD COLUMN {col} {col_type}")
+            except:
+                pass
     else:
         cur.execute("CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, vk_id BIGINT UNIQUE, full_name TEXT, department TEXT)")
         cur.execute("CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, user_id INTEGER, class_name TEXT, order_date DATE, meal_type TEXT, count_plat INTEGER DEFAULT 0, count_bes INTEGER DEFAULT 0, count_svo INTEGER DEFAULT 0, count_ovz INTEGER DEFAULT 0, count_podvoz INTEGER DEFAULT 0, names_plat TEXT DEFAULT '', names_bes TEXT DEFAULT '', names_svo TEXT DEFAULT '', names_ovz TEXT DEFAULT '', names_podvoz TEXT DEFAULT '', status TEXT DEFAULT 'новый')")
         for col, col_type in [("count_podvoz", "INTEGER DEFAULT 0"), ("names_plat", "TEXT DEFAULT ''"), ("names_bes", "TEXT DEFAULT ''"), ("names_svo", "TEXT DEFAULT ''"), ("names_ovz", "TEXT DEFAULT ''"), ("names_podvoz", "TEXT DEFAULT ''")]:
             try: cur.execute(f"ALTER TABLE orders ADD COLUMN IF NOT EXISTS {col} {col_type}")
             except: pass
-    conn.commit(); conn.close()
+    
+    conn.commit()
+    conn.close()
     print("✅ База данных инициализирована")
 
 def add_user(vk_id, name, dept="не указан"):
