@@ -18,7 +18,7 @@ def get_db_connection():
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
         import sqlite3
-        db_path = os.environ.get("DB_PATH", "canteen.db")
+        db_path = os.environ.get("DB_PATH", "/app/data/canteen.db")
         return sqlite3.connect(db_path), "sqlite"
     import psycopg2
     result = urllib.parse.urlparse(db_url)
