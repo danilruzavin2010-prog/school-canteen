@@ -4,7 +4,10 @@ import time
 import os
 import datetime
 import urllib.parse
-from flask import Flask, render_template_string, request
+import io
+from flask import Flask, render_template_string, request, send_file
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
 
 # === ЗАПУСК БОТА В ФОНЕ ===
 def run_bot():
@@ -40,11 +43,6 @@ def get_db_connection():
         port=result.port
     )
     return conn, "postgresql"
-
-# === HEALTHCHECK ДЛЯ AMVERA ===
-@app.route('/health')
-def health():
-    return "OK", 200
 
 HTML = """
 <!DOCTYPE html>
@@ -96,6 +94,8 @@ HTML = """
         .date-form { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid #eee; }
         .date-form input[type="date"] { padding: 10px 12px; border: 1px solid #ccc; border-radius: 10px; font-size: 16px; flex: 1 1 180px; }
         .date-form button { padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        .export-btn { display: inline-block; padding: 12px 24px; background: #2e7d32; color: white; text-decoration: none; border-radius: 10px; font-size: 16px; font-weight: bold; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(46,125,50,0.3); }
+        .export-btn:hover { background: #1b5e20; }
         @media (max-width: 600px) {
             body { padding: 6px; }
             .container { padding: 10px 8px; border-radius: 12px; }
@@ -120,6 +120,8 @@ HTML = """
 <div class="container">
     <h1>🍽 Панель столовой</h1>
     <div class="subtitle">Заказы на {{ date }}</div>
+
+    <a href="/export?date={{ date }}" class="export-btn">📊 Скачать Excel</a>
 
     <div class="filters">
         <a href="?date={{ date }}&meal=" class="filter-btn {{ 'active' if meal_filter == '' else '' }}">Все</a>
@@ -172,19 +174,14 @@ HTML = """
     <div class="totals">
         <div><span class="label">Платники</span></div>
         <div class="value plat">{{ total_plat }}</div>
-
         <div><span class="label">Бесплатники</span></div>
         <div class="value bes">{{ total_bes }}</div>
-
         <div><span class="label">СВО</span></div>
         <div class="value svo">{{ total_svo }}</div>
-
         <div><span class="label">ОВЗ</span></div>
         <div class="value ovz">{{ total_ovz }}</div>
-
         <div><span class="label">Подвоз</span></div>
         <div class="value podvoz">{{ total_podvoz }}</div>
-
         <div class="total-people-block">
             <span class="label">👥 Всего человек</span>
             <span class="value people">{{ total_people }}</span>
@@ -257,6 +254,61 @@ def panel():
         total_people=total_people,
         date=date_str,
         meal_filter=meal_filter
+    )
+
+@app.route('/export')
+def export_excel():
+    date_str = request.args.get('date', datetime.date.today().isoformat())
+    
+    conn, db_type = get_db_connection()
+    cur = conn.cursor()
+    
+    if db_type == "postgresql":
+        cur.execute("SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE order_date = %s ORDER BY class_name", (date_str,))
+    else:
+        cur.execute("SELECT class_name, meal_type, count_plat, count_bes, count_svo, count_ovz, count_podvoz FROM orders WHERE order_date = ? ORDER BY class_name", (date_str,))
+    
+    rows = cur.fetchall()
+    conn.close()
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Заказы"
+    
+    headers = ["Класс", "Приём", "Платники", "Бесплатники", "СВО", "ОВЗ", "Подвоз", "Всего"]
+    ws.append(headers)
+    
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="4CAF50")
+        cell.alignment = Alignment(horizontal="center")
+    
+    total = [0, 0, 0, 0, 0]
+    for r in rows:
+        cn, mt, cp, cb, cs, co, cpz = r
+        total_people = cp + cb + cs + co + cpz
+        ws.append([cn, mt, cp, cb, cs, co, cpz, total_people])
+        total[0] += cp
+        total[1] += cb
+        total[2] += cs
+        total[3] += co
+        total[4] += cpz
+    
+    ws.append(["ИТОГО", "", total[0], total[1], total[2], total[3], total[4], sum(total)])
+    
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or "")) for cell in col)
+        ws.column_dimensions[col[0].column_letter].width = max_len + 4
+    
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f"orders_{date_str}.xlsx"
     )
 
 if __name__ == "__main__":
