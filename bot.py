@@ -566,26 +566,3 @@ def handle_message(event, vk):
         except:
             pass
 
-if __name__ == "__main__":
-    init_db()
-    vk_session = vk_api.VkApi(token=VK_TOKEN)
-    vk = vk_session.get_api()
-    longpoll = VkBotLongPoll(vk_session, GROUP_ID)
-    print("🤖 SWILL BOT ACTIVE")
-    print("Жду сообщений...")
-    
-    while True:
-        try:
-            for event in longpoll.listen():
-                if event.type == VkBotEventType.MESSAGE_NEW:
-                    handle_message(event, vk)
-        except Exception as e:
-            print(f"⚠️ Ошибка longpoll: {e}")
-            print("Переподключение через 10 секунд...")
-            time.sleep(10)
-            try:
-                longpoll = VkBotLongPoll(vk_session, GROUP_ID)
-                print("✅ Переподключено")
-            except Exception as e2:
-                print(f"❌ Не удалось переподключиться: {e2}")
-                time.sleep(30)
