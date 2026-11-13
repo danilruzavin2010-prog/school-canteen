@@ -543,27 +543,22 @@ def show_orders_by_date(vk, from_id, date_str, label):
                     send(vk, from_id, "Напиши ФАМИЛИИ подвоза через запятую:", None)
                     return
                 
-                            if "current_category" in temp_data[from_id]:
-                    cat = temp_data[from_id]["current_category"]
-                    msg_stripped = msg.strip()
-                    
-                    if msg_stripped.isdigit():
-                        count = int(msg_stripped)
-                        temp_data[from_id][f"names_{cat}"] = [f"x{count}"]
-                        total_in_cat = count
-                        added_text = f"✅ Добавлено {count} чел. (без фамилий)"
-                    else:
-                        names = clean_names(msg)
-                        temp_data[from_id][f"names_{cat}"].extend(names)
-                        total_in_cat = len(temp_data[from_id][f"names_{cat}"])
-                        added_text = f"✅ Добавлено {len(names)} фамилий"
-                    
-                    cat_names = {"plat": "Платники", "bes": "Бесплатники", "svo": "СВО", "ovz": "ОВЗ", "podvoz": "Подвоз"}
-                    send(vk, from_id, f"{added_text} в {cat_names[cat]}.\nВсего: {total_in_cat}\n\nВыбери следующую категорию или нажми ✅ Готово:", get_category_keyboard())
-                    return
-                
-                send(vk, from_id, "Выбери категорию кнопкой ниже:", get_category_keyboard())
-                return
+         if "current_category" in temp_data[from_id]:
+            cat = temp_data[from_id]["current_category"]
+            msg_stripped = msg.strip()
+            if msg_stripped.isdigit():
+                count = int(msg_stripped)
+                temp_data[from_id][f"names_{cat}"] = [f"x{count}"]
+                total_in_cat = count
+                added_text = f"✅ Добавлено {count} чел. (без фамилий)"
+            else:
+                names = clean_names(msg)
+                temp_data[from_id][f"names_{cat}"].extend(names)
+                total_in_cat = len(temp_data[from_id][f"names_{cat}"])
+                added_text = f"✅ Добавлено {len(names)} фамилий"
+            cat_names = {"plat": "Платники", "bes": "Бесплатники", "svo": "СВО", "ovz": "ОВЗ", "podvoz": "Подвоз"}
+            send(vk, from_id, f"{added_text} в {cat_names[cat]}.\nВсего: {total_in_cat}\n\nВыбери следующую категорию или нажми ✅ Готово:", get_category_keyboard())
+            return
 
         send(vk, from_id, "📌 Выбери действие на клавиатуре 👇", get_main_keyboard(from_id))
 
