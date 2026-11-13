@@ -540,23 +540,21 @@ def handle_message(event, vk):
                     temp_data[from_id]["current_category"] = "ovz"
                     send(vk, from_id, "Напиши ФАМИЛИИ ОВЗ через запятую:", None)
                     return
-        if msg == "🚌 Подвоз":
-            temp_data[from_id]["current_category"] = "podvoz"
-            send(vk, from_id, "Напиши ФАМИЛИИ подвоза через запятую:", None)
-            return
+                        if msg == "🚌 Подвоз":
+                    temp_data[from_id]["current_category"] = "podvoz"
+                    send(vk, from_id, "Напиши ФАМИЛИИ подвоза через запятую:", None)
+                    return
                 
-                        if "current_category" in temp_data[from_id]:
+                if "current_category" in temp_data[from_id]:
                     cat = temp_data[from_id]["current_category"]
                     msg_stripped = msg.strip()
                     
                     if msg_stripped.isdigit():
-                        # Если ввели ТОЛЬКО цифру — сохраняем как количество
                         count = int(msg_stripped)
                         temp_data[from_id][f"names_{cat}"] = [f"x{count}"]
                         total_in_cat = count
                         added_text = f"✅ Добавлено {count} чел. (без фамилий)"
                     else:
-                        # Если ввели фамилии — обрабатываем как раньше
                         names = clean_names(msg)
                         temp_data[from_id][f"names_{cat}"].extend(names)
                         total_in_cat = len(temp_data[from_id][f"names_{cat}"])
@@ -565,6 +563,9 @@ def handle_message(event, vk):
                     cat_names = {"plat": "Платники", "bes": "Бесплатники", "svo": "СВО", "ovz": "ОВЗ", "podvoz": "Подвоз"}
                     send(vk, from_id, f"{added_text} в {cat_names[cat]}.\nВсего: {total_in_cat}\n\nВыбери следующую категорию или нажми ✅ Готово:", get_category_keyboard())
                     return
+                
+                send(vk, from_id, "Выбери категорию кнопкой ниже:", get_category_keyboard())
+                return
                 
         send(vk, from_id, "Выбери категорию кнопкой ниже:", get_category_keyboard())
         return
