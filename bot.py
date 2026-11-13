@@ -7,7 +7,6 @@ import re
 import urllib.parse
 import time
 
-# === КОНФИГ ===
 VK_TOKEN = os.environ.get("VK_TOKEN", "vk1.a.z1AGhRJTlOfwdx4ldltGvv10FPkpmfgUHproUb6uREpo0Ao2TH8PCldeXPDFY7O7qVVkd2NdhCtOd1EJ321WsxAXw_BfL8U13lkhK3JC77rUvMuHAhqiaGB4VPMFnMvb9qhEjWXyXwzf4RtQIshOIxxFbKUJUjaEQgX9aouqhvaHYM0zvVLzTDE_9qEmIlFVIE7x7oGrqNuTYDWXGj2T4A")
 GROUP_ID = 241386335
 STAFF_IDS = [523723395, 768610229, 165518301, 424711270, 157860178]
@@ -479,8 +478,7 @@ def show_orders_by_date(vk, from_id, date_str, label):
                      "Когда закончишь — нажми ✅ Готово",
                      get_category_keyboard())
                 return
-            
-            if step == "category":
+                            if step == "category":
                 if msg == "✅ Готово":
                     total_names = sum(len(temp_data[from_id][f"names_{c}"]) for c in ["plat","bes","svo","ovz","podvoz"])
                     if total_names == 0:
@@ -521,8 +519,7 @@ def show_orders_by_date(vk, from_id, date_str, label):
                     send(vk, from_id, "🔙 Вернулись к выбору приёма пищи.\n\nВыбери заново:", get_main_keyboard(from_id))
                     del temp_data[from_id]
                     return
-                
-                if msg == "💳 Платники":
+                                    if msg == "💳 Платники":
                     temp_data[from_id]["current_category"] = "plat"
                     send(vk, from_id, "Напиши ФАМИЛИИ платников через запятую:", None)
                     return
@@ -538,27 +535,32 @@ def show_orders_by_date(vk, from_id, date_str, label):
                     temp_data[from_id]["current_category"] = "ovz"
                     send(vk, from_id, "Напиши ФАМИЛИИ ОВЗ через запятую:", None)
                     return
-                        if msg == "🚌 Подвоз":
+                if msg == "🚌 Подвоз":
                     temp_data[from_id]["current_category"] = "podvoz"
                     send(vk, from_id, "Напиши ФАМИЛИИ подвоза через запятую:", None)
                     return
                 
-         if "current_category" in temp_data[from_id]:
-            cat = temp_data[from_id]["current_category"]
-            msg_stripped = msg.strip()
-            if msg_stripped.isdigit():
-                count = int(msg_stripped)
-                temp_data[from_id][f"names_{cat}"] = [f"x{count}"]
-                total_in_cat = count
-                added_text = f"✅ Добавлено {count} чел. (без фамилий)"
-            else:
-                names = clean_names(msg)
-                temp_data[from_id][f"names_{cat}"].extend(names)
-                total_in_cat = len(temp_data[from_id][f"names_{cat}"])
-                added_text = f"✅ Добавлено {len(names)} фамилий"
-            cat_names = {"plat": "Платники", "bes": "Бесплатники", "svo": "СВО", "ovz": "ОВЗ", "podvoz": "Подвоз"}
-            send(vk, from_id, f"{added_text} в {cat_names[cat]}.\nВсего: {total_in_cat}\n\nВыбери следующую категорию или нажми ✅ Готово:", get_category_keyboard())
-            return
+                if "current_category" in temp_data[from_id]:
+                    cat = temp_data[from_id]["current_category"]
+                    msg_stripped = msg.strip()
+                    
+                    if msg_stripped.isdigit():
+                        count = int(msg_stripped)
+                        temp_data[from_id][f"names_{cat}"] = [f"x{count}"]
+                        total_in_cat = count
+                        added_text = f"✅ Добавлено {count} чел. (без фамилий)"
+                    else:
+                        names = clean_names(msg)
+                        temp_data[from_id][f"names_{cat}"].extend(names)
+                        total_in_cat = len(temp_data[from_id][f"names_{cat}"])
+                        added_text = f"✅ Добавлено {len(names)} фамилий"
+                    
+                    cat_names = {"plat": "Платники", "bes": "Бесплатники", "svo": "СВО", "ovz": "ОВЗ", "podvoz": "Подвоз"}
+                    send(vk, from_id, f"{added_text} в {cat_names[cat]}.\nВсего: {total_in_cat}\n\nВыбери следующую категорию или нажми ✅ Готово:", get_category_keyboard())
+                    return
+                
+                send(vk, from_id, "Выбери категорию кнопкой ниже:", get_category_keyboard())
+                return
 
         send(vk, from_id, "📌 Выбери действие на клавиатуре 👇", get_main_keyboard(from_id))
 
@@ -568,3 +570,26 @@ def show_orders_by_date(vk, from_id, date_str, label):
             send(vk, from_id, f"⚠️ Ошибка: {type(e).__name__}: {e}", get_main_keyboard(from_id))
         except:
             pass
+
+if __name__ == "__main__":
+    init_db()
+    vk_session = vk_api.VkApi(token=VK_TOKEN)
+    vk = vk_session.get_api()
+    longpoll = VkBotLongPoll(vk_session, GROUP_ID)
+    print("🤖 SWILL BOT ACTIVE")
+    print("Жду сообщений...")
+    while True:
+        try:
+            for event in longpoll.listen():
+                if event.type == VkBotEventType.MESSAGE_NEW:
+                    handle_message(event, vk)
+        except Exception as e:
+            print(f"⚠️ Ошибка longpoll: {e}")
+            print("Переподключение через 10 секунд...")
+            time.sleep(10)
+            try:
+                longpoll = VkBotLongPoll(vk_session, GROUP_ID)
+                print("✅ Переподключено")
+            except Exception as e2:
+                print(f"❌ Не удалось переподключиться: {e2}")
+                time.sleep(30)
