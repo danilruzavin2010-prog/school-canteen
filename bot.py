@@ -244,9 +244,10 @@ def show_orders_by_date(vk, from_id, date_str, label):
         reply += f"  Платники: {cp} | Бесплатники: {cb} | СВО: {cs} | ОВЗ: {co} | Подвоз: {cpz}\n\n"
     reply += f"Напиши #ID заказа для редактирования."
     send(vk, from_id, reply, get_main_keyboard(from_id))
-    def handle_message(event, vk):
-    global temp_data
-    try:
+    
+def handle_message(event, vk):
+        global temp_data
+        try:
         msg = event.obj.message['text'].strip()
         msg_lower = msg.lower()
         from_id = event.obj.message['from_id']
