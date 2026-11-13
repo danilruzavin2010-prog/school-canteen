@@ -57,7 +57,6 @@ def init_db():
         for col, col_type in [("count_podvoz", "INTEGER DEFAULT 0"), ("names_plat", "TEXT DEFAULT ''"), ("names_bes", "TEXT DEFAULT ''"), ("names_svo", "TEXT DEFAULT ''"), ("names_ovz", "TEXT DEFAULT ''"), ("names_podvoz", "TEXT DEFAULT ''")]:
             try: cur.execute(f"ALTER TABLE orders ADD COLUMN IF NOT EXISTS {col} {col_type}")
             except: pass
-    
     conn.commit()
     conn.close()
     print("✅ База данных инициализирована")
@@ -218,7 +217,7 @@ def show_my_orders(vk, from_id, user_id):
         reply += f"#{order_id} 🏫 {class_name} ({meal_type}): {total} чел.\n"
         reply += f"  Платники: {cp} | Бесплатники: {cb} | СВО: {cs} | ОВЗ: {co} | Подвоз: {cpz}\n\n"
     send(vk, from_id, reply, get_main_keyboard(from_id))
-    
+
 def show_all_orders(vk, from_id):
     rows = get_all_orders_today()
     if not rows:
@@ -246,8 +245,7 @@ def show_orders_by_date(vk, from_id, date_str, label):
         reply += f"  Платники: {cp} | Бесплатники: {cb} | СВО: {cs} | ОВЗ: {co} | Подвоз: {cpz}\n\n"
     reply += f"Напиши #ID заказа для редактирования."
     send(vk, from_id, reply, get_main_keyboard(from_id))
-
-def handle_message(event, vk):
+    def handle_message(event, vk):
     global temp_data
     try:
         msg = event.obj.message['text'].strip()
@@ -544,38 +542,3 @@ def handle_message(event, vk):
                     temp_data[from_id]["current_category"] = "podvoz"
                     send(vk, from_id, "Напиши ФАМИЛИИ подвоза через запятую:", None)
                     return
-                
-                if "current_category" in temp_data[from_id]:
-                    cat = temp_data[from_id]["current_category"]
-                    msg_stripped = msg.strip()
-                    
-                    if msg_stripped.isdigit():
-                        count = int(msg_stripped)
-                        temp_data[from_id][f"names_{cat}"] = [f"x{count}"]
-                        total_in_cat = count
-                        added_text = f"✅ Добавлено {count} чел. (без фамилий)"
-                    else:
-                        names = clean_names(msg)
-                        temp_data[from_id][f"names_{cat}"].extend(names)
-                        total_in_cat = len(temp_data[from_id][f"names_{cat}"])
-                        added_text = f"✅ Добавлено {len(names)} фамилий"
-                    
-                    cat_names = {"plat": "Платники", "bes": "Бесплатники", "svo": "СВО", "ovz": "ОВЗ", "podvoz": "Подвоз"}
-                    send(vk, from_id, f"{added_text} в {cat_names[cat]}.\nВсего: {total_in_cat}\n\nВыбери следующую категорию или нажми ✅ Готово:", get_category_keyboard())
-                    return
-                
-                send(vk, from_id, "Выбери категорию кнопкой ниже:", get_category_keyboard())
-                return
-                
-        send(vk, from_id, "Выбери категорию кнопкой ниже:", get_category_keyboard())
-        return
-
-        send(vk, from_id, "📌 Выбери действие на клавиатуре 👇", get_main_keyboard(from_id))
-
-    except Exception as e:
-        print(f"❌ ОШИБКА: {type(e).__name__}: {e}")
-        try:
-            send(vk, from_id, f"⚠️ Ошибка: {type(e).__name__}: {e}", get_main_keyboard(from_id))
-        except:
-            pass
-
