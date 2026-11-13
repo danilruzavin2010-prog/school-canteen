@@ -543,7 +543,7 @@ def show_orders_by_date(vk, from_id, date_str, label):
                     send(vk, from_id, "Напиши ФАМИЛИИ подвоза через запятую:", None)
                     return
                 
-                        if "current_category" in temp_data[from_id]:
+                if "current_category" in temp_data[from_id]:
                     cat = temp_data[from_id]["current_category"]
                     msg_stripped = msg.strip()
                     
@@ -564,3 +564,12 @@ def show_orders_by_date(vk, from_id, date_str, label):
                 
                 send(vk, from_id, "Выбери категорию кнопкой ниже:", get_category_keyboard())
                 return
+
+        send(vk, from_id, "📌 Выбери действие на клавиатуре 👇", get_main_keyboard(from_id))
+
+    except Exception as e:
+        print(f"❌ ОШИБКА: {type(e).__name__}: {e}")
+        try:
+            send(vk, from_id, f"⚠️ Ошибка: {type(e).__name__}: {e}", get_main_keyboard(from_id))
+        except:
+            pass
