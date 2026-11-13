@@ -543,7 +543,7 @@ def show_orders_by_date(vk, from_id, date_str, label):
                     send(vk, from_id, "Напиши ФАМИЛИИ подвоза через запятую:", None)
                     return
                 
-                        if "current_category" in temp_data[from_id]:
+                            if "current_category" in temp_data[from_id]:
                     cat = temp_data[from_id]["current_category"]
                     msg_stripped = msg.strip()
                     
